@@ -1,0 +1,32 @@
+# Python / uv (each assignment dir also carries the course's own .gitignore)
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Datasets: downloaded by scripts/, never committed
+assignment1-basics/data/
+
+# Training artifacts. Keep checkpoints in a checkpoints/ dir; test fixtures use .pt/.npz so
+# extensions are deliberately not ignored.
+checkpoints/
+ckpt/
+wandb/
+runs/
+outputs/
+logs/
+
+# Submission tarballs the course scripts produce
+*.tar.gz
+*.zip
+
+# Throwaway snippets
+scratch/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
