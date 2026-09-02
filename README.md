@@ -44,7 +44,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 
 - [ ] `unicode1` Understanding Unicode (1 pt)
 - [ ] `unicode2` Unicode Encodings (3 pts)
-- [ ] `train_bpe` BPE Tokenizer Training (15 pts)
+- [x] `train_bpe` BPE Tokenizer Training (15 pts)
 - [ ] `train_bpe_tinystories` BPE Training on TinyStories (2 pts)
 - [ ] `train_bpe_expts_owt` BPE Training on OpenWebText (2 pts)
 - [ ] `tokenizer` Implementing the tokenizer (15 pts)

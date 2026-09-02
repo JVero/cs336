@@ -30,3 +30,6 @@ scratch/
 .DS_Store
 .idea/
 .vscode/
+
+# Profiler output (py-spy record -o profile.svg)
+profile*.svg
