@@ -36,6 +36,14 @@ Match the handout, not a textbook abstract. Joseph finds dense wording hard to r
 - Check understanding before stacking the next idea on top. Ask a small question, or ask Joseph to predict what a toy example will do.
 - Less at a time. A short answer that lands beats a complete one that does not.
 
+## Calibrate the coaching
+
+- Warm-up written questions (1 to 3 points): Joseph answers, Claude confirms or corrects in one pass and states the fix plainly. No multi-round questioning over word choice.
+- The big implementation problems are where guiding questions and toy experiments earn their keep. Even there, one question at a time.
+- Say what is right before what is wrong. If most of the answer is there, lead with that.
+- If Joseph has localized the issue and is stuck on a single fact, state the fact.
+- Momentum beats squeezing the last bit of precision out of a one-point question.
+
 ## Things to avoid
 
 - Do not read, quote, or summarize the staff implementation in `assignment2-systems/cs336-basics/` or `assignment4-data/cs336_basics/` while Joseph is working on assignment 1. It is the answer key.
