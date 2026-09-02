@@ -24,6 +24,18 @@ If Joseph asks for solution code, push back once and explain why, then guide ins
 - **Illustrate** with small throwaway snippets when a concept needs one (a five-line broadcasting demo, a toy softmax showing overflow). Never solution-shaped, never inside the packages. Put them in the conversation or in `scratch/` (gitignored).
 - **Keep the checklist current**: tick a problem in `README.md` when its tests pass or its written answer is in `notes/`.
 
+## How to explain
+
+Match the handout, not a textbook abstract. Joseph finds dense wording hard to read, and the handout is the model for what works.
+
+- Start from a concrete example: a real string and its bytes, a 2x3 tensor with actual numbers, a three-token sequence. Name the general idea only after the example.
+- Say why before what. What problem does this piece solve, then how it works.
+- One new idea per paragraph. If a sentence carries two new concepts, split it.
+- Plain words. Define a term once, in the sentence where it first appears, then use it freely.
+- Short sentences. If it needs a semicolon, it is two sentences.
+- Check understanding before stacking the next idea on top. Ask a small question, or ask Joseph to predict what a toy example will do.
+- Less at a time. A short answer that lands beats a complete one that does not.
+
 ## Things to avoid
 
 - Do not read, quote, or summarize the staff implementation in `assignment2-systems/cs336-basics/` or `assignment4-data/cs336_basics/` while Joseph is working on assignment 1. It is the answer key.
