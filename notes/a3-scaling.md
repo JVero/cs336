@@ -6,11 +6,11 @@ One heading per graded problem. Written answers, experiment numbers, plots, and 
 
 ## chinchilla_isoflops
 
-  IsoFLOPs scaling laws (5 points)
+IsoFLOPs scaling laws (5 points)
 
 
 ## scaling_laws
 
-  Constructing scaling laws leaderboard (50 points)
+Constructing scaling laws leaderboard (50 points)
 
 

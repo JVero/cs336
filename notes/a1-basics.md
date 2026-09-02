@@ -6,186 +6,186 @@ One heading per graded problem. Written answers, experiment numbers, plots, and 
 
 ## unicode1
 
-  Understanding Unicode (1 point)
+Understanding Unicode (1 point)
 
 
 ## unicode2
 
-  Unicode Encodings (3 points)
+Unicode Encodings (3 points)
 
 
 ## train_bpe
 
-  BPE Tokenizer Training (15 points)
+BPE Tokenizer Training (15 points)
 
 
 ## train_bpe_tinystories
 
-  BPE Training on TinyStories (2 points)
+BPE Training on TinyStories (2 points)
 
 
 ## train_bpe_expts_owt
 
-  BPE Training on OpenWebText (2 points)
+BPE Training on OpenWebText (2 points)
 
 
 ## tokenizer
 
-  Implementing the tokenizer (15 points)
+Implementing the tokenizer (15 points)
 
 
 ## tokenizer_experiments
 
-  Experiments with tokenizers (4 points)
+Experiments with tokenizers (4 points)
 
 
 ## linear
 
-  Implementing the linear module (1 point)
+Implementing the linear module (1 point)
 
 
 ## embedding
 
-  Implement the embedding module (1 point)
+Implement the embedding module (1 point)
 
 
 ## rmsnorm
 
-  Root Mean Square Layer Normalization (1 point)
+Root Mean Square Layer Normalization (1 point)
 
 
 ## positionwise_feedforward
 
-  Implement the position-wise feed-forward network (2 points)
+Implement the position-wise feed-forward network (2 points)
 
 
 ## rope
 
-  Implement RoPE (2 points)
+Implement RoPE (2 points)
 
 
 ## softmax
 
-  Implement softmax (1 point)
+Implement softmax (1 point)
 
 
 ## scaled_dot_product_attention
 
-  Implement scaled dot-product attention (5 points)
+Implement scaled dot-product attention (5 points)
 
 
 ## multihead_self_attention
 
-  Implement causal multi-head self-attention (5 points)
+Implement causal multi-head self-attention (5 points)
 
 
 ## transformer_block
 
-  Implement the Transformer block (3 points)
+Implement the Transformer block (3 points)
 
 
 ## transformer_lm
 
-  Implementing the Transformer LM (3 points)
+Implementing the Transformer LM (3 points)
 
 
 ## transformer_accounting
 
-  Transformer LM resource accounting (5 points)
+Transformer LM resource accounting (5 points)
 
 
 ## cross_entropy
 
-  Implement cross-entropy (1 point)
+Implement cross-entropy (1 point)
 
 
 ## learning_rate_tuning
 
-  Tuning the learning rate (1 point)
+Tuning the learning rate (1 point)
 
 
 ## adamw
 
-  Implement AdamW (2 points)
+Implement AdamW (2 points)
 
 
 ## adamw_accounting
 
-  Resource accounting for training with AdamW (2 points)
+Resource accounting for training with AdamW (2 points)
 
 
 ## learning_rate_schedule
 
-  Implement cosine learning rate schedule with warmup (1 point)
+Implement cosine learning rate schedule with warmup (1 point)
 
 
 ## gradient_clipping
 
-  Implement gradient clipping (1 point)
+Implement gradient clipping (1 point)
 
 
 ## data_loading
 
-  Implement data loading (2 points)
+Implement data loading (2 points)
 
 
 ## training_together
 
-  Put it together (4 points)
+Put it together (4 points)
 
 
 ## decoding
 
-  Decoding (3 points)
+Decoding (3 points)
 
 
 ## experiment_log
 
-  Experiment logging (3 points)
+Experiment logging (3 points)
 
 
 ## learning_rate
 
-  Tune the learning rate (2 B200 hrs) (3 points)
+Tune the learning rate (2 B200 hrs) (3 points)
 
 
 ## batch_size_experiment
 
-  Batch size variations (1 B200 hr) (1 point)
+Batch size variations (1 B200 hr) (1 point)
 
 
 ## generate
 
-  Generate text (1 point)
+Generate text (1 point)
 
 
 ## layer_norm_ablation
 
-  Remove RMSNorm and train (0.5 B200 hrs) (1 point)
+Remove RMSNorm and train (0.5 B200 hrs) (1 point)
 
 
 ## pre_norm_ablation
 
-  Implement post-norm and train (0.5 B200 hrs) (1 point)
+Implement post-norm and train (0.5 B200 hrs) (1 point)
 
 
 ## no_pos_emb
 
-  Implement NoPE (0.5 B200 hrs) (1 point)
+Implement NoPE (0.5 B200 hrs) (1 point)
 
 
 ## swiglu_ablation
 
-  SwiGLU vs. SiLU (0.5 B200 hrs) (1 point)
+SwiGLU vs. SiLU (0.5 B200 hrs) (1 point)
 
 
 ## main_experiment
 
-  Experiment on OWT (2 B200 hrs) (2 points)
+Experiment on OWT (2 B200 hrs) (2 points)
 
 
 ## leaderboard
 
-  Leaderboard (10 B200 hrs) (6 points)
+Leaderboard (10 B200 hrs) (6 points)
 
 
