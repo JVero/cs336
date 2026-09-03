@@ -1,6 +1,6 @@
 import regex as re
 
-from collections import Counter
+from collections import Counter, defaultdict
 from itertools import pairwise
 from functools import reduce
 
@@ -14,6 +14,9 @@ from multiprocessing import Pool
 # To profile this
 # sudo uv run py-spy record --subprocesses -o profile_graph.svg \
 # -- python -m cs336_basics.train_bpe
+
+# To time this
+# time uv run python -m cs336_basics.train_bpe
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
@@ -62,9 +65,14 @@ def train_bpe(input_path: str,
     
     ### Step 1 - Find the most occurring pairs of token IDs
     pair_count = Counter()
-    for word, count in occurrences.items(): # this gets rebuilt every time
+    
+    # lists all the words that have a pair of bytes
+    pair_words = defaultdict(set)
+    
+    for word, count in occurrences.items():
         for pair in pairwise(word):
             pair_count[pair] += count
+            pair_words[pair].add(word)
     ### Build the vocabulary to vocab_size
     while idx < vocab_size: 
                 
@@ -74,50 +82,74 @@ def train_bpe(input_path: str,
         merges.append((vocab[new_token_pair[0]], vocab[new_token_pair[1]]))
         vocab[idx] = vocab[new_token_pair[0]] + vocab[new_token_pair[1]]
 
-        ### Step 3 - Build the occurrence dictionary with the new token replacing the 2 it represents
-        # new_occurrences = {}
-        occurrences_to_change = []
-        for occurrence in occurrences:
+        words_to_change = []
+        for word in pair_words[new_token_pair]:
             i = 0
-            new_occurrence = []
-            new_token_found = False
-            while i < len(occurrence):
-                ### Token found, replace it, and increment 2
-                if i != len(occurrence) - 1 and (occurrence[i], occurrence[i+1]) == new_token_pair:
-                    new_occurrence.append(idx)
-                    new_token_found = True
-                    i+=2
-                ### Token not found, add the current token ID and increment 1
-                else: 
-                    new_occurrence.append(occurrence[i])
+            new_word = []
+            while i < len(word):
+                if i != len(word) - 1 and (word[i], word[i+1]) == new_token_pair:
+                    new_word.append(idx)
+                    i += 2
+                else:
+                    new_word.append(word[i])
                     i += 1
-            ### The number of times this tuple exists does not change
-            if new_token_found:
-                occurrences_to_change.append((tuple(new_occurrence), occurrence))
-        
-        ## Update the pairwise count, 
-        # out with the old and in with the new
-        for new, old in occurrences_to_change:
+            words_to_change.append((tuple(new_word), word))
+
+        for new, old in words_to_change:
             for pair in pairwise(old):
                 pair_count[pair] -= occurrences[old]
                 if pair_count[pair] == 0:
                     pair_count.pop(pair, None)
+                if old in pair_words[pair]:
+                    pair_words[pair].remove(old)
             for pair in pairwise(new):
                 pair_count[pair] += occurrences[old]
+                pair_words[pair].add(new)
             occurrences[new] = occurrences[old]
             occurrences.pop(old, None)
-        pair_count = +pair_count
+            
+
+        ### Step 3 - Build the occurrence dictionary with the new token replacing the 2 it represents
+        # new_occurrences = {}
+        # occurrences_to_change = []
+        # for occurrence in occurrences:
+        #     i = 0
+        #     new_occurrence = []
+        #     if new_token_pair not in pairwise(occurrence):
+        #         continue
+        #     while i < len(occurrence):
+        #         ### Token found, replace it, and increment 2
+        #         if i != len(occurrence) - 1 and (occurrence[i], occurrence[i+1]) == new_token_pair:
+        #             new_occurrence.append(idx)
+        #             i+=2
+        #         ### Token not found, add the current token ID and increment 1
+        #         else: 
+        #             new_occurrence.append(occurrence[i])
+        #             i += 1
+        #     ### The number of times this tuple exists does not change
+        #     occurrences_to_change.append((tuple(new_occurrence), occurrence))
+        
+        # ## Update the pairwise count, 
+        # # out with the old and in with the new
+        # for new, old in occurrences_to_change:
+        #     for pair in pairwise(old):
+        #         pair_count[pair] -= occurrences[old]
+        #         if pair_count[pair] == 0:
+        #             pair_count.pop(pair, None)
+        #     for pair in pairwise(new):
+        #         pair_count[pair] += occurrences[old]
+        #     occurrences[new] = occurrences[old]
+        #     occurrences.pop(old, None)
         idx += 1
     return vocab, merges
     
 def train_bpe_tinystories(num_workers):
-    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-train.txt"
-    vocab, mergelist = train_bpe(input_path, 10000,["<|endoftext|>"], num_workers=num_workers)
+    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-valid.txt"
+    vocab, mergelist = train_bpe(input_path, 400,["<|endoftext|>"], num_workers=num_workers)
     readable_vocab = {k : v.hex() for k,v in vocab.items()}
     import json
     with open("valid_vocab.json", "w+") as f:
-        return; 
-    json.dump(readable_vocab, f)
+        json.dump(readable_vocab, f)
     
 
     
