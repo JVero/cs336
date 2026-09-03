@@ -100,6 +100,8 @@ def train_bpe(input_path: str,
         for new, old in occurrences_to_change:
             for pair in pairwise(old):
                 pair_count[pair] -= occurrences[old]
+                if pair_count[pair] == 0:
+                    pair_count.pop(pair, None)
             for pair in pairwise(new):
                 pair_count[pair] += occurrences[old]
             occurrences[new] = occurrences[old]
@@ -109,8 +111,8 @@ def train_bpe(input_path: str,
     return vocab, merges
     
 def train_bpe_tinystories(num_workers):
-    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-valid.txt"
-    vocab, mergelist = train_bpe(input_path, 400,["<|endoftext|>"], num_workers=num_workers)
+    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-train.txt"
+    vocab, mergelist = train_bpe(input_path, 10000,["<|endoftext|>"], num_workers=num_workers)
     readable_vocab = {k : v.hex() for k,v in vocab.items()}
     import json
     with open("valid_vocab.json", "w+") as f:
