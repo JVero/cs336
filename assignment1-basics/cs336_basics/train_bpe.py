@@ -43,7 +43,7 @@ def build_occurrences(fp, start, stop, special_tokens):
 
 def train_bpe(input_path: str,
               vocab_size: int,
-              special_tokens: list[str], num_workers=4) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
+              special_tokens: list[str], *, num_chunks=120, num_workers=12) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
         
     ### Build the initial ASCII vocabulary, and the empty merge list
     ### vocab, merges are the return values    
@@ -58,7 +58,7 @@ def train_bpe(input_path: str,
         vocab[idx] = token.encode("utf-8")
         idx += 1
     with open(input_path, 'rb') as f:    
-        offsets = find_chunk_boundaries(f, num_workers, bytes("<|endoftext|>", encoding="utf-8"))
+        offsets = find_chunk_boundaries(f, num_chunks, bytes("<|endoftext|>", encoding="utf-8"))
     with Pool(num_workers) as p:
         results = p.starmap(build_occurrences, [(input_path, start, stop, special_tokens) for start,stop in pairwise(offsets)])
     occurrences = reduce(lambda x,y: x + y, results)
@@ -109,9 +109,9 @@ def train_bpe(input_path: str,
         idx += 1
     return vocab, merges
     
-def train_bpe_tinystories(num_workers):
-    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-valid.txt"
-    vocab, mergelist = train_bpe(input_path, 400,["<|endoftext|>"], num_workers=num_workers)
+def train_bpe_tinystories(*, num_chunks=120, num_workers=12):
+    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-train.txt"
+    vocab, mergelist = train_bpe(input_path, 400,["<|endoftext|>"], num_chunks=num_chunks, num_workers=num_workers)
     readable_vocab = {k : v.hex() for k,v in vocab.items()}
     import json
     with open("valid_vocab.json", "w+") as f:
@@ -120,5 +120,5 @@ def train_bpe_tinystories(num_workers):
 
     
 if __name__ == "__main__":
-    train_bpe_tinystories(12)
+    train_bpe_tinystories(num_chunks=120, num_workers=12)
     print("done")
