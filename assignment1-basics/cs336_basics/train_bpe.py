@@ -100,46 +100,12 @@ def train_bpe(input_path: str,
                 pair_count[pair] -= occurrences[old]
                 if pair_count[pair] == 0:
                     pair_count.pop(pair, None)
-                if old in pair_words[pair]:
-                    pair_words[pair].remove(old)
+                pair_words[pair].discard(old)
             for pair in pairwise(new):
                 pair_count[pair] += occurrences[old]
                 pair_words[pair].add(new)
             occurrences[new] = occurrences[old]
             occurrences.pop(old, None)
-            
-
-        ### Step 3 - Build the occurrence dictionary with the new token replacing the 2 it represents
-        # new_occurrences = {}
-        # occurrences_to_change = []
-        # for occurrence in occurrences:
-        #     i = 0
-        #     new_occurrence = []
-        #     if new_token_pair not in pairwise(occurrence):
-        #         continue
-        #     while i < len(occurrence):
-        #         ### Token found, replace it, and increment 2
-        #         if i != len(occurrence) - 1 and (occurrence[i], occurrence[i+1]) == new_token_pair:
-        #             new_occurrence.append(idx)
-        #             i+=2
-        #         ### Token not found, add the current token ID and increment 1
-        #         else: 
-        #             new_occurrence.append(occurrence[i])
-        #             i += 1
-        #     ### The number of times this tuple exists does not change
-        #     occurrences_to_change.append((tuple(new_occurrence), occurrence))
-        
-        # ## Update the pairwise count, 
-        # # out with the old and in with the new
-        # for new, old in occurrences_to_change:
-        #     for pair in pairwise(old):
-        #         pair_count[pair] -= occurrences[old]
-        #         if pair_count[pair] == 0:
-        #             pair_count.pop(pair, None)
-        #     for pair in pairwise(new):
-        #         pair_count[pair] += occurrences[old]
-        #     occurrences[new] = occurrences[old]
-        #     occurrences.pop(old, None)
         idx += 1
     return vocab, merges
     
