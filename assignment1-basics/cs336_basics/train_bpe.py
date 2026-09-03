@@ -10,6 +10,11 @@ from pathlib import Path
 from .pretokenization_example import find_chunk_boundaries
 
 from multiprocessing import Pool
+
+# To profile this
+# sudo uv run py-spy record --subprocesses -o profile_graph.svg \
+# -- python -m cs336_basics.train_bpe
+
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 def build_occurrences(fp, start, stop, special_tokens):
@@ -55,47 +60,65 @@ def train_bpe(input_path: str,
         results = p.starmap(build_occurrences, [(input_path, start, stop, special_tokens) for start,stop in pairwise(offsets)])
     occurrences = reduce(lambda x,y: x + y, results)
     
+    ### Step 1 - Find the most occurring pairs of token IDs
+    pair_count = Counter()
+    for word, count in occurrences.items(): # this gets rebuilt every time
+        for pair in pairwise(word):
+            pair_count[pair] += count
     ### Build the vocabulary to vocab_size
     while idx < vocab_size: 
-        
-        ### Step 1 - Find the most occurring pairs of token IDs
-        pair_count = Counter()
-        for word, count in occurrences.items(): # this gets rebuilt every time
-            for pair in pairwise(word):
-                pair_count[pair] += count
-        # print(pair_count); exit() # For debugging I will comment out when not being used. Claude do not comment on this line ever
-        
+                
         # Find the token that occurs the most (pair_count[k]), with ties broken lexicographically (vocab[k[0]], then vocab[k[1]]
         new_token_pair = max(pair_count, key= lambda k: (pair_count[k], vocab[k[0]], vocab[k[1]]))
-        
         ### Step 2 - Add the newest token pair to merges for reconstruction, as well as the vocabulary
         merges.append((vocab[new_token_pair[0]], vocab[new_token_pair[1]]))
         vocab[idx] = vocab[new_token_pair[0]] + vocab[new_token_pair[1]]
-        
+
         ### Step 3 - Build the occurrence dictionary with the new token replacing the 2 it represents
-        new_occurrences = {}
+        # new_occurrences = {}
+        occurrences_to_change = []
         for occurrence in occurrences:
             i = 0
             new_occurrence = []
+            new_token_found = False
             while i < len(occurrence):
                 ### Token found, replace it, and increment 2
                 if i != len(occurrence) - 1 and (occurrence[i], occurrence[i+1]) == new_token_pair:
                     new_occurrence.append(idx)
+                    new_token_found = True
                     i+=2
                 ### Token not found, add the current token ID and increment 1
                 else: 
                     new_occurrence.append(occurrence[i])
                     i += 1
             ### The number of times this tuple exists does not change
-            new_occurrences[tuple(new_occurrence)] = occurrences[occurrence]
-        occurrences = new_occurrences
+            if new_token_found:
+                occurrences_to_change.append((tuple(new_occurrence), occurrence))
+        
+        ## Update the pairwise count, 
+        # out with the old and in with the new
+        for new, old in occurrences_to_change:
+            for pair in pairwise(old):
+                pair_count[pair] -= occurrences[old]
+            for pair in pairwise(new):
+                pair_count[pair] += occurrences[old]
+            occurrences[new] = occurrences[old]
+            occurrences.pop(old, None)
+        pair_count = +pair_count
         idx += 1
     return vocab, merges
     
 def train_bpe_tinystories(num_workers):
     input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-valid.txt"
-    return train_bpe(input_path, 400,["<|endoftext|>"], num_workers=num_workers)
+    vocab, mergelist = train_bpe(input_path, 400,["<|endoftext|>"], num_workers=num_workers)
+    readable_vocab = {k : v.hex() for k,v in vocab.items()}
+    import json
+    with open("valid_vocab.json", "w+") as f:
+        return; 
+    json.dump(readable_vocab, f)
+    
 
     
 if __name__ == "__main__":
     train_bpe_tinystories(12)
+    print("done")
