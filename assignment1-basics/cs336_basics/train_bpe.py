@@ -151,6 +151,6 @@ def train_bpe_valid_owt(*, num_chunks=120, num_workers=12):
     return train_dataset("owt_valid.txt", vocab_size=100)
 
 if __name__ == "__main__":
-    train_bpe_valid_owt()
-    # train_bpe_expts_owt(num_chunks=500)
+    # train_bpe_valid_owt()
+    train_bpe_expts_owt(num_chunks=500)
     print("done")

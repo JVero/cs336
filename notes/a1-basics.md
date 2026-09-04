@@ -31,7 +31,14 @@ BPE Training on TinyStories (2 points)
 ## train_bpe_expts_owt
 
 BPE Training on OpenWebText (2 points)
+a. The longest token in the vocab, found using
+from cs336_basics.tokenizer import Tokenizer
+tok = Tokenizer.from_files("owt_train_vocab.json", "owt_train_merges.json")
+max(tok.id_to_bytes.values(), key=len).decode("utf-8")
 
+"ÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂÃÂ" is the result, which is mojibake
+
+b. TinyStories is cleaner because it is 1. shorter, and 2. more curated so there's only real words in it.
 
 ## tokenizer
 
