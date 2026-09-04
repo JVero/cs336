@@ -33,3 +33,4 @@ scratch/
 
 # Profiler output (py-spy record -o profile.svg)
 profile*.svg
+assignment1-basics/valid_vocab.json

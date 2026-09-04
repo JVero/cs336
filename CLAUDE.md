@@ -65,4 +65,4 @@ Match the handout, not a textbook abstract. Joseph finds dense wording hard to r
 
 ## Commits
 
-Commit after each problem's tests pass or a written answer lands. Message format: `a1: implement train_bpe`, `a1: answer unicode1`, `tooling: add benchmark script`.
+Joseph commits. When a problem's tests pass or a written answer lands, say so and stop; never run `git commit` unless he explicitly asks in that message. Message format: `a1: implement train_bpe`, `a1: answer unicode1`, `tooling: add benchmark script`.

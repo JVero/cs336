@@ -33,12 +33,14 @@ class Tokenizer():
             self.merge_ranks[merge_key] = i
             self.merge_ids[(self.i_vocab[l], self.i_vocab[r])] = self.i_vocab[l + r]
             
-        self.special_tokens = special_tokens
+        self.special_tokens = special_tokens and sorted(special_tokens, key=lambda t: len(t), reverse=True)
 
         self.st_pattern = "("+"|".join([re.escape(st) for st in self.special_tokens]) +")" if self.special_tokens else None
+
         self.num_chunks = num_chunks
         self.num_workers = num_workers
         
+    @classmethod    
     def from_files(cls, vocab_filepath, merges_filepath, special_tokens=None):
         """
         a file is a big json file dictionary
@@ -52,21 +54,21 @@ class Tokenizer():
         docs = re.splititer(self.st_pattern, text) if self.st_pattern else [text]
 
         for doc in docs:
-            if doc in self.special_tokens:
-                rval.append( self.i_vocab[doc] )
+            
+            if self.special_tokens and doc in self.special_tokens:
+                rval.append( self.i_vocab[bytes(doc, encoding="utf-8")] )
                 continue
             pretokens = re.finditer(PAT, doc)
             
             # Convert the string into a list of pretokens
             # then those pretokens turn into lists of bytes
-            pretoken_bytes = []
+            pretoken_ids = []
             for pretoken in pretokens:
-                pretoken_bytes.append(list(pretoken[0].encode("utf-8")))
-            
+                pretoken_ids.append([self.i_vocab[bytes([pt])] for pt in bytes(pretoken[0], encoding="utf-8")])
             # For each "word", apply the possible merges from left to right
             # for lots of merges, it would make sense to check that list once and 
             # the pretoken_bytes many times
-            for ptb in pretoken_bytes:
+            for ptb in pretoken_ids:
                 more_ranks = True
                 while more_ranks:
                     new_ptb = []
@@ -90,21 +92,34 @@ class Tokenizer():
             
         return rval
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
-        pass
-    def decode(self, ids: list[int]):
-        pass
+        for line in iterable:
+            yield from self.encode(line)
+            
+    def decode(self, ids: list[int]) -> str:
+        rval = b""
+        for id in ids:
+            
+            rval += self.vocab[id]
+        
+        return rval.decode("utf-8", errors = "replace")
     
 if __name__ == "__main__":
     vocab = {}
-    special_characters = ["<|endoftext|>"]
+    special_characters = ["<|endoftext|>", "<|endoftext|><|endoftext|>"]
     for i in range(256):
         vocab[i] = bytes([i])
     i = 256
     for character in special_characters:
-        vocab[i] = character
+        vocab[i] = bytes(character, encoding="utf-8")
     i += 1 
     vocab[i] = b"cd"
     i += 1
     vocab[i] = b"ba"
     tok = Tokenizer(vocab, [(b"c", b"d"), (b"b", b"a")], special_characters)
-    print(tok.encode("ba ba ba<|endoftext|>"))
+    inp = "ba ba baé<|endoftext|>"
+    enc = tok.encode(inp)
+    dec = tok.decode(enc)
+    print(inp, enc, dec)
+    print(inp == dec)
+    
+    
