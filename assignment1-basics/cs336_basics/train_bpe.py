@@ -44,21 +44,22 @@ def build_occurrences(fp, start, stop, special_tokens):
         print("\r", start, end="", flush=True)
         return occurrences
 
-def train_bpe(input_path: str,
+def train_bpe(input_path: str | Path,
               vocab_size: int,
               special_tokens: list[str], *, num_chunks=120, num_workers=12) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
         
     ### Build the initial ASCII vocabulary, and the empty merge list
     ### vocab, merges are the return values    
-    vocab = {}
+    # vocab: dict[int, bytes] = {}
+    id_to_bytes: dict[int, bytes] = {}
     for i in range(256): 
-        vocab[i] = bytes([i])
+        id_to_bytes[i] = bytes([i])
     merges = []    
         
     ### Encode the special tokens, then add them to the vocabulary
     idx = 256
     for token in special_tokens:
-        vocab[idx] = token.encode("utf-8")
+        id_to_bytes[idx] = token.encode("utf-8")
         idx += 1
     with open(input_path, 'rb') as f:    
         offsets = find_chunk_boundaries(f, num_chunks, bytes("<|endoftext|>", encoding="utf-8"))
@@ -89,10 +90,10 @@ def train_bpe(input_path: str,
         for k, v in pair_count.items():
             if v == max_occ:
                 valid_pairs.append((k[0],k[1]))
-        new_token_pair = max(valid_pairs, key=lambda k: (vocab[k[0]], vocab[k[1]]))
+        new_token_pair = max(valid_pairs, key=lambda k: (id_to_bytes[k[0]], id_to_bytes[k[1]]))
         ### Step 2 - Add the newest token pair to merges for reconstruction, as well as the vocabulary
-        merges.append((vocab[new_token_pair[0]], vocab[new_token_pair[1]]))
-        vocab[idx] = vocab[new_token_pair[0]] + vocab[new_token_pair[1]]
+        merges.append((id_to_bytes[new_token_pair[0]], id_to_bytes[new_token_pair[1]]))
+        id_to_bytes[idx] = id_to_bytes[new_token_pair[0]] + id_to_bytes[new_token_pair[1]]
 
         words_to_change = []
         for word in pair_words[new_token_pair]:
@@ -119,7 +120,7 @@ def train_bpe(input_path: str,
                 pair_words[pair].add(new)
             occurrences[new] = old_occ
             occurrences.pop(old, None)
-    return vocab, merges
+    return id_to_bytes, merges
     
 def train_dataset(data_filename, *,data_dir: Path =  Path(__file__).parent.parent / "data", vocab_size=10_000, special_tokens=["<|endoftext|>"], num_chunks=120, num_workers=12):
     from glob import glob
