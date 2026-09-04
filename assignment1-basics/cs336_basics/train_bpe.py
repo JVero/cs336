@@ -84,7 +84,12 @@ def train_bpe(input_path: str,
     for idx in trange(start, vocab_size):
                 
         # Find the token that occurs the most (pair_count[k]), with ties broken lexicographically (vocab[k[0]], then vocab[k[1]]
-        new_token_pair = max(pair_count, key= lambda k: (pair_count[k], vocab[k[0]], vocab[k[1]]))
+        max_occ = max(pair_count.values())
+        valid_pairs = []
+        for k, v in pair_count.items():
+            if v == max_occ:
+                valid_pairs.append((k[0],k[1]))
+        new_token_pair = max(valid_pairs, key=lambda k: (vocab[k[0]], vocab[k[1]]))
         ### Step 2 - Add the newest token pair to merges for reconstruction, as well as the vocabulary
         merges.append((vocab[new_token_pair[0]], vocab[new_token_pair[1]]))
         vocab[idx] = vocab[new_token_pair[0]] + vocab[new_token_pair[1]]
@@ -142,8 +147,9 @@ def train_bpe_expts_owt(*, num_chunks=120, num_workers=12):
     return train_dataset("owt_train.txt", vocab_size=32_000)
     
 def train_bpe_valid_owt(*, num_chunks=120, num_workers=12):
-    return train_dataset("owt_valid.txt", vocab_size=1_000)
+    return train_dataset("owt_valid.txt", vocab_size=100)
 
 if __name__ == "__main__":
-    train_bpe_expts_owt(num_chunks=500)
+    train_bpe_valid_owt()
+    # train_bpe_expts_owt(num_chunks=500)
     print("done")
