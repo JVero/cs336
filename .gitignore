@@ -33,5 +33,5 @@ scratch/
 
 # Profiler output (py-spy record -o profile.svg)
 profile*.svg
-assignment1-basics/*_vocab.json
-assignment1-basics/*_merges.json
+assignment1-basics/*_vocab*.json
+assignment1-basics/*_merges*.json
