@@ -63,7 +63,10 @@ def train_bpe(input_path: str,
         offsets = find_chunk_boundaries(f, num_chunks, bytes("<|endoftext|>", encoding="utf-8"))
     with Pool(num_workers) as p:
         results = p.starmap(build_occurrences, [(input_path, start, stop, special_tokens) for start,stop in pairwise(offsets)])
-    occurrences = reduce(lambda x,y: x + y, results)
+    # occurrences = reduce(lambda x,y: x.update(y), results)
+    occurrences = Counter()
+    for result in results:
+        occurrences.update(result)
     
     ### Step 1 - Find the most occurring pairs of token IDs
     pair_count = Counter()
