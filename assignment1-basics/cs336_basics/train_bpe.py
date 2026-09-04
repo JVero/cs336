@@ -110,13 +110,15 @@ def train_bpe(input_path: str,
     return vocab, merges
     
 def train_bpe_tinystories(*, num_chunks=120, num_workers=12):
-    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-train.txt"
-    vocab, mergelist = train_bpe(input_path, 10_000,["<|endoftext|>"], num_chunks=num_chunks, num_workers=num_workers)
+    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-valid.txt"
+    vocab, mergelist = train_bpe(input_path, 400,["<|endoftext|>"], num_chunks=num_chunks, num_workers=num_workers)
     readable_vocab = {k : v.hex() for k,v in vocab.items()}
+    readable_merges = [(l.hex(), r.hex()) for l, r in mergelist]
     import json
     with open("valid_vocab.json", "w+") as f:
         json.dump(readable_vocab, f)
-    
+    with open("valid_merges.json", "w+") as f:
+        json.dump(readable_merges, f)
 
     
 if __name__ == "__main__":

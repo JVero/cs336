@@ -45,8 +45,12 @@ class Tokenizer():
         """
         a file is a big json file dictionary
         """
-        vocab = json.load(vocab_filepath)
-        merges = json.load(merges_filepath)
+        with open(vocab_filepath, 'r') as f:
+            vocab = json.load(f)
+        vocab = {int(k): bytes.fromhex(v) for k, v in vocab.items()}
+        with open(merges_filepath) as f:
+            merges = json.load(f)
+        merges = [(bytes.fromhex(l), bytes.fromhex(r)) for l, r in merges]
         return cls(vocab, merges, special_tokens=special_tokens)
         
     def encode(self, text: str) -> list[int]:
