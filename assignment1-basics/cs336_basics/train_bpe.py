@@ -69,7 +69,7 @@ def train_bpe(input_path: str | Path,
     occurrences = Counter()
     for result in results:
         occurrences.update(result)
-    
+    del results
     ### Step 1 - Find the most occurring pairs of token IDs
     pair_count = Counter()
     
@@ -115,6 +115,8 @@ def train_bpe(input_path: str | Path,
                 if pair_count[pair] == 0:
                     pair_count.pop(pair, None)
                 pair_words[pair].discard(old)
+                if len(pair_words[pair]) == 0:
+                    del pair_words[pair]
             for pair in pairwise(new):
                 pair_count[pair] += old_occ
                 pair_words[pair].add(new)
