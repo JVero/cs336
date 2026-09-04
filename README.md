@@ -47,7 +47,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `train_bpe` BPE Tokenizer Training (15 pts)
 - [ ] `train_bpe_tinystories` BPE Training on TinyStories (2 pts)
 - [ ] `train_bpe_expts_owt` BPE Training on OpenWebText (2 pts)
-- [ ] `tokenizer` Implementing the tokenizer (15 pts)
+- [x] `tokenizer` Implementing the tokenizer (15 pts)
 - [ ] `tokenizer_experiments` Experiments with tokenizers (4 pts)
 - [ ] `linear` Implementing the linear module (1 pt)
 - [ ] `embedding` Implement the embedding module (1 pt)
