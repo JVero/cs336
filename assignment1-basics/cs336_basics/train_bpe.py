@@ -11,7 +11,7 @@ from .pretokenization_example import find_chunk_boundaries
 
 from multiprocessing import Pool
 
-from tqdm import trange
+from tqdm import trange, tqdm
 
 # To profile this
 # sudo uv run py-spy record --subprocesses -o profile_graph.svg \
@@ -41,6 +41,7 @@ def build_occurrences(fp, start, stop, special_tokens):
                 # Turn the chunk into a tuple of token IDs
                 byte_chunk = tuple(chunk[0].encode('utf-8'))
                 occurrences[byte_chunk] += 1
+        print("\r", start, end="", flush=True)
         return occurrences
 
 def train_bpe(input_path: str,
@@ -81,7 +82,6 @@ def train_bpe(input_path: str,
     ### Build the vocabulary to vocab_size
     start = idx
     for idx in trange(start, vocab_size):
-    # while idx < vocab_size: 
                 
         # Find the token that occurs the most (pair_count[k]), with ties broken lexicographically (vocab[k[0]], then vocab[k[1]]
         new_token_pair = max(pair_count, key= lambda k: (pair_count[k], vocab[k[0]], vocab[k[1]]))
@@ -103,17 +103,17 @@ def train_bpe(input_path: str,
             words_to_change.append((tuple(new_word), word))
 
         for new, old in words_to_change:
+            old_occ = occurrences[old]
             for pair in pairwise(old):
-                pair_count[pair] -= occurrences[old]
+                pair_count[pair] -= old_occ
                 if pair_count[pair] == 0:
                     pair_count.pop(pair, None)
                 pair_words[pair].discard(old)
             for pair in pairwise(new):
-                pair_count[pair] += occurrences[old]
+                pair_count[pair] += old_occ
                 pair_words[pair].add(new)
-            occurrences[new] = occurrences[old]
+            occurrences[new] = old_occ
             occurrences.pop(old, None)
-        # idx += 1
     return vocab, merges
     
 def train_dataset(data_filename, *,data_dir: Path =  Path(__file__).parent.parent / "data", vocab_size=10_000, special_tokens=["<|endoftext|>"], num_chunks=120, num_workers=12):
@@ -145,5 +145,5 @@ def train_bpe_valid_owt(*, num_chunks=120, num_workers=12):
     return train_dataset("owt_valid.txt", vocab_size=1_000)
 
 if __name__ == "__main__":
-    train_bpe_valid_owt()
+    train_bpe_expts_owt(num_chunks=500)
     print("done")
