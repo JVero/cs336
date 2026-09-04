@@ -7,20 +7,24 @@ One heading per graded problem. Written answers, experiment numbers, plots, and 
 ## unicode1
 
 Understanding Unicode (1 point)
-
+a. chr(0) returns a string with only a null character
+b. on the Python REPL, chr(0) shows as "\x00" but in print is an invisible character.
+c. If this character occurs in text, it mainly throws off comparisons. For example "hi" + chr(0) "." != "hi."
 
 ## unicode2
+a. UTF-8 is the majority of web data, it has a predictible representation, and it takes up less space than UTF-32. 
+b. Decoding bytes one at a time is incorrect because there are some characters like e with an accent on top that need to be decoded as a pair rather than something that can be done byte by byte. The correct implementation is bytestring.decode("utf-8") "é".encode("utf-8") is something that breaks in their function
+c. A two byte sequence that doesn't encode to any unicode character is 0xFF 0xFF
 
 Unicode Encodings (3 points)
 
-
 ## train_bpe
+In train_bpe.py
 
 BPE Tokenizer Training (15 points)
-
-
 ## train_bpe_tinystories
-
+a. I got this done in 74 seconds using about 1.2gb of ram using 12 workers and 120 chunks of the dataset. The longest tokens are whole words the same length as ' accomplishment' that commonly occur in the dataset, which makes sense.
+b. The part of the tokenizer training process that takes the most time is finding the next eligible merge target, as profiled when looking at max over the pair counts, it takes 62% of the runtime
 BPE Training on TinyStories (2 points)
 
 
