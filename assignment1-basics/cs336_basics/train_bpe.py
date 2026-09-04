@@ -113,7 +113,7 @@ def train_bpe(input_path: str,
                 pair_words[pair].add(new)
             occurrences[new] = occurrences[old]
             occurrences.pop(old, None)
-        idx += 1
+        # idx += 1
     return vocab, merges
     
 def train_dataset(data_filename, *,data_dir: Path =  Path(__file__).parent.parent / "data",num_chunks=120, num_workers=12):
