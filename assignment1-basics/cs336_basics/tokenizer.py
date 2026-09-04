@@ -103,23 +103,4 @@ class Tokenizer():
         
         return rval.decode("utf-8", errors = "replace")
     
-if __name__ == "__main__":
-    vocab = {}
-    special_characters = ["<|endoftext|>", "<|endoftext|><|endoftext|>"]
-    for i in range(256):
-        vocab[i] = bytes([i])
-    i = 256
-    for character in special_characters:
-        vocab[i] = bytes(character, encoding="utf-8")
-    i += 1 
-    vocab[i] = b"cd"
-    i += 1
-    vocab[i] = b"ba"
-    tok = Tokenizer(vocab, [(b"c", b"d"), (b"b", b"a")], special_characters)
-    inp = "ba ba baé<|endoftext|>"
-    enc = tok.encode(inp)
-    dec = tok.decode(enc)
-    print(inp, enc, dec)
-    print(inp == dec)
-    
     
