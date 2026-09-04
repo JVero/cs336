@@ -109,17 +109,34 @@ def train_bpe(input_path: str,
         idx += 1
     return vocab, merges
     
-def train_bpe_tinystories(*, num_chunks=120, num_workers=12):
-    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-valid.txt"
-    vocab, mergelist = train_bpe(input_path, 400,["<|endoftext|>"], num_chunks=num_chunks, num_workers=num_workers)
+def train_dataset(data_filename, *,data_dir: Path =  Path(__file__).parent.parent / "data",num_chunks=120, num_workers=12):
+    from glob import glob
+    if not data_dir.is_dir():
+        raise ValueError(f"{str(data_dir)} is not a directory.")
+    pattern = f"{data_dir}/*"
+        
+    data_files = glob(pattern)
+    if str(data_dir / data_filename) not in map(str, data_files):
+        print(data_files)
+        raise ValueError(f"No file named {data_filename} in {data_dir}")
+    
+    input_path = data_dir / data_filename
+    
+    vocab, mergelist = train_bpe(input_path, 10_000,["<|endoftext|>"], num_chunks=num_chunks, num_workers=num_workers)
     readable_vocab = {k : v.hex() for k,v in vocab.items()}
     readable_merges = [(l.hex(), r.hex()) for l, r in mergelist]
     import json
-    with open("valid_vocab.json", "w+") as f:
+    with open(input_path.stem + "_vocab.json", "w+") as f:
         json.dump(readable_vocab, f)
-    with open("valid_merges.json", "w+") as f:
+    with open(input_path.stem + "_merges.json", "w+") as f:
         json.dump(readable_merges, f)
+    
+def train_bpe_tinystories(*, num_chunks=120, num_workers=12):
+    return train_dataset( "TinyStoriesV2-GPT4-valid.txt")
 
+def train_bpe_expts_owt(*, num_chunks=120, num_workers=12):
+    input_path = Path(__file__).parent.parent / "data" / "TinyStoriesV2-GPT4-valid.txt"
+    
     
 if __name__ == "__main__":
     train_bpe_tinystories(num_chunks=120, num_workers=12)
