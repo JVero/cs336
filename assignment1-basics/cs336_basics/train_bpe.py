@@ -11,6 +11,8 @@ from .pretokenization_example import find_chunk_boundaries
 
 from multiprocessing import Pool
 
+from tqdm import trange
+
 # To profile this
 # sudo uv run py-spy record --subprocesses -o profile_graph.svg \
 # -- python -m cs336_basics.train_bpe
@@ -74,7 +76,9 @@ def train_bpe(input_path: str,
             pair_count[pair] += count
             pair_words[pair].add(word)
     ### Build the vocabulary to vocab_size
-    while idx < vocab_size: 
+    start = idx
+    for idx in trange(start, vocab_size):
+    # while idx < vocab_size: 
                 
         # Find the token that occurs the most (pair_count[k]), with ties broken lexicographically (vocab[k[0]], then vocab[k[1]]
         new_token_pair = max(pair_count, key= lambda k: (pair_count[k], vocab[k[0]], vocab[k[1]]))
