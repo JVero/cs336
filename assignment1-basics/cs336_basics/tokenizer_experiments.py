@@ -29,7 +29,7 @@ vocabs_and_merges = {
     owt_valid: ("owt_valid_vocab.json", "owt_valid_merges.json")
 }
 
-tok = None
+tok: Tokenizer
 
 def build_tokenizer(v_path, m_path):
     global tok
@@ -81,7 +81,7 @@ def convert_docs(*, dataset, tokenizer,  chunk_size=100_000_000, n_worker=12):
     opath = fpath.with_suffix(".npy")
     
     out_chunks = np.concatenate(chunks, dtype=np.uint16)
-    np.save(opath, out_chunks)
+    # np.save(opath, out_chunks)
 
 if __name__ == "__main__":
     # Part A
