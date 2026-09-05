@@ -49,8 +49,8 @@ class Tokenizer():
             vocab: dict[int, bytes] = json.load(f)
         vocab = {int(k): bytes.fromhex(v) for k, v in vocab.items()}
         with open(merges_filepath) as f:
-            merges: list[tuple[str, str]] = json.load(f)
-        merges: list[tuple[bytes, bytes]] = [(bytes.fromhex(l), bytes.fromhex(r)) for l, r in merges]
+            merge_strs: list[tuple[str, str]] = json.load(f)
+        merges: list[tuple[bytes, bytes]] = [(bytes.fromhex(l), bytes.fromhex(r)) for l, r in merge_strs]
         return cls(vocab, merges, special_tokens=special_tokens)
         
     def encode(self, text: str) -> list[int]:
