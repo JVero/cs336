@@ -2,7 +2,8 @@ from torch import nn
 import torch
 
 import math
-import einops
+
+from einops import einsum
 
 class Linear(nn.Module):
     def __init__(self, in_features: int, out_features: int, device: torch.device | None = None, dtype=None):
@@ -19,7 +20,7 @@ class Linear(nn.Module):
         nn.init.trunc_normal_(self.W, mean=0, std=std,a=-3*std, b=3*std)
             
     def forward(self, X):
-        return einops.einsum(X, self.W, "... in_features, out_features in_features -> ... out_features")
+        return einsum(X, self.W, "... in_features, out_features in_features -> ... out_features")
 
 class Embedding(nn.Module):
     def __init__(self,
