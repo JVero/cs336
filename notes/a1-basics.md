@@ -48,7 +48,11 @@ Implementing the tokenizer (15 points)
 ## tokenizer_experiments
 
 Experiments with tokenizers (4 points)
-
+a. 
+Compression ratio for tinystories-train using tinystories-train 4.164006604292791
+Compression ratio for owt-train using owt-train 4.690217391304348
+b.
+Compression ratio for owt-train using tinystories-train 3.1927807219278073. The chunks get smaller because the efficient representation in one domain doesn't necessarily transfer to the other domain
 
 ## linear
 
