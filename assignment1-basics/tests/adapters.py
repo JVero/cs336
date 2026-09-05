@@ -9,6 +9,7 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
+from cs336_basics.transformer import Linear
 
 def run_linear(
     d_in: int,
@@ -28,10 +29,11 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
+    model = Linear(d_in, d_out)
+    model.load_state_dict({"W": weights})
+    return model(in_features)
 
-    raise NotImplementedError
-
-
+from cs336_basics.transformer import Embedding
 def run_embedding(
     vocab_size: int,
     d_model: int,
@@ -50,8 +52,9 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-
-    raise NotImplementedError
+    model = Embedding(vocab_size, d_model)
+    model.load_state_dict({"W": weights})
+    return model(token_ids)
 
 
 def run_swiglu(
