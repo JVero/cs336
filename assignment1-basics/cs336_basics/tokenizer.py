@@ -39,6 +39,8 @@ class Tokenizer():
 
         self.num_chunks = num_chunks
         self.num_workers = num_workers
+        self.pretoken_cache = {}
+
         
     @classmethod    
     def from_files(cls, vocab_filepath, merges_filepath, special_tokens=None):
@@ -56,9 +58,7 @@ class Tokenizer():
     def encode(self, text: str) -> list[int]:
         rval = []
         docs = re.splititer(self.st_pattern, text) if self.st_pattern else [text]
-
         for doc in docs:
-            
             if self.special_tokens and doc in self.special_tokens:
                 rval.append( self.i_vocab[bytes(doc, encoding="utf-8")] )
                 continue
@@ -66,15 +66,20 @@ class Tokenizer():
             
             # Convert the string into a list of pretokens
             # then those pretokens turn into lists of bytes
-            pretoken_ids = []
-            for pretoken in pretokens:
-                pretoken_ids.append([self.i_vocab[bytes([pt])] for pt in bytes(pretoken[0], encoding="utf-8")])
+            for pretoken_match in pretokens:
+                pretoken = pretoken_match[0]
             # For each "word", apply the possible merges from left to right
             # for lots of merges, it would make sense to check that list once and 
             # the pretoken_bytes many times
-            for ptb in pretoken_ids:
+            # for i, ptb in enumerate(pretoken_ids):
                 more_ranks = True
-                while more_ranks:
+                if pretoken in self.pretoken_cache.keys():
+                    ptb = self.pretoken_cache[pretoken]
+                    need_to_compute = False
+                else:
+                    need_to_compute = True
+                    ptb = [self.i_vocab[bytes([pt])] for pt in bytes(pretoken, encoding="utf-8")]
+                while need_to_compute and more_ranks:
                     new_ptb = []
                     ranks = [(pair, self.merge_ranks.get(pair, None)) for pair in pairwise(ptb) if pair in self.merge_ranks.keys()]
                     if not ranks: # there are no merges to do
@@ -91,8 +96,8 @@ class Tokenizer():
                                 i+=1
                         ptb = new_ptb
                 # pretoken turned into ints
-                for ptb_val in ptb:
-                    rval.append(ptb_val)
+                self.pretoken_cache[pretoken] = ptb
+                rval.extend(ptb)
             
         return rval
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:

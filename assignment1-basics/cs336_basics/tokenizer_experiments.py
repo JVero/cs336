@@ -6,6 +6,10 @@ from pathlib import Path
 
 import numpy as np
 
+from multiprocessing import Pool
+from .pretokenization_example import find_chunk_boundaries
+from itertools import pairwise
+
 ts_train = "tinystories-train"
 ts_valid = "tinystories-valid"
 owt_train = "owt-train"
@@ -25,8 +29,24 @@ vocabs_and_merges = {
     owt_valid: ("owt_valid_vocab.json", "owt_valid_merges.json")
 }
 
-def sample_docs(*, dataset, tokenizer, save=False):
-    
+tok = None
+
+def build_tokenizer(v_path, m_path):
+    global tok
+    tok = Tokenizer.from_files(v_path, m_path, special_tokens = ["<|endoftext|>"])
+
+
+def process_chunk(fpath, start, stop):
+    global tok
+    chunks = []
+    with open(fpath, 'rb') as f:
+        f.seek(start)
+        text = f.read(stop-start).decode("utf-8")
+        for line in text.splitlines(keepends=True):
+            chunks.extend(tok.encode(line))
+        return np.array(chunks, dtype=np.uint16)
+
+def sample_docs(*, dataset, tokenizer):
     fpath = Path(__file__).parent.parent / "data" / datasets[dataset]
     v_path, m_path = vocabs_and_merges[tokenizer]
     
@@ -45,37 +65,23 @@ def sample_docs(*, dataset, tokenizer, save=False):
                 n_docs += 1
             toks = tok.encode(newline)
             n_toks += len(toks)
-            if save:
-                all_toks.extend(toks)
-    if save:
-        out_path = fpath.with_suffix(".npy")
-        np.save(out_path, np.array(all_toks, dtype=np.uint16))
-    print(f"Compression ratio for {dataset} using {tokenizer} {n_bytes/n_toks}")
 
-def convert_docs(*, dataset, tokenizer):
+def convert_docs(*, dataset, tokenizer,  chunk_size=100_000_000, n_worker=12):
     fpath = Path(__file__).parent.parent / "data" / datasets[dataset]
     v_path, m_path = vocabs_and_merges[tokenizer]
     
+    n_chunk = 1+fpath.stat().st_size // chunk_size
     
-    tok = Tokenizer.from_files(v_path, m_path, special_tokens = ["<|endoftext|>"])
+    with open(fpath, 'rb') as f:    
+        offsets = find_chunk_boundaries(f, n_chunk, bytes("<|endoftext|>", encoding="utf-8"))
+    
+    with Pool(n_worker, initializer=build_tokenizer, initargs=(v_path, m_path)) as p:
+        chunks = p.starmap(process_chunk, [(fpath, start, stop) for start, stop in pairwise(offsets)])
+    
     opath = fpath.with_suffix(".npy")
-    read_bytes = 0
-    flush_bytes = 5_000_000
-    chunks = []
-    np_chunks = []
-    size = fpath.stat().st_size
-    tot_read = 0
-    with open(fpath, 'r') as in_f, open(opath, 'wb') as out_f:
-        while chunk := in_f.readline():
-            chunks.extend(tok.encode(chunk))
-            if len(chunks) > flush_bytes:
-                tot_read += len(chunks)
-                np_chunks.append(np.array(chunks, dtype=np.uint16))
-                print(f"Wrote {4*tot_read} of {size} bytes: {4*tot_read/size}")
-                chunks = []
-        np_chunks.append(np.array(chunks, dtype=np.uint16))
-        out_chunks = np.concatenate(np_chunks)
-        np.save(out_f, out_chunks)
+    
+    out_chunks = np.concatenate(chunks, dtype=np.uint16)
+    np.save(opath, out_chunks)
 
 if __name__ == "__main__":
     # Part A

@@ -53,6 +53,8 @@ Compression ratio for tinystories-train using tinystories-train 4.16400660429279
 Compression ratio for owt-train using owt-train 4.690217391304348
 b.
 Compression ratio for owt-train using tinystories-train 3.1927807219278073. The chunks get smaller because the efficient representation in one domain doesn't necessarily transfer to the other domain
+c. When I measured the throughput of 50mb it took 42 seconds. At about 1.2mb/s, it would take about 8 nonstop days to tokenize 825gb of data. Afterwards I built a parallel and cached version of the tokenizer that processed all the data in 314s, which means the speed increased to about 48mb/s on the whole ~15gb dataset.
+d. uint16 is an appropriate datatype because for a vocab size of 32_000, you'll need bits such that 2^bits > 32_000 -> log2(32000) = 14.9. uint16 is the smallest value that fits that 
 
 ## linear
 
