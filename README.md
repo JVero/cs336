@@ -52,7 +52,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `linear` Implementing the linear module (1 pt)
 - [x] `embedding` Implement the embedding module (1 pt)
 - [x] `rmsnorm` Root Mean Square Layer Normalization (1 pt)
-- [ ] `positionwise_feedforward` Implement the position-wise feed-forward network (2 pts)
+- [x] `positionwise_feedforward` Implement the position-wise feed-forward network (2 pts)
 - [ ] `rope` Implement RoPE (2 pts)
 - [ ] `softmax` Implement softmax (1 pt)
 - [ ] `scaled_dot_product_attention` Implement scaled dot-product attention (5 pts)
