@@ -56,6 +56,7 @@ def run_embedding(
     model.load_state_dict({"W": weights})
     return model(token_ids)
 
+from cs336_basics.transformer import SwiGLU
 
 def run_swiglu(
     d_model: int,
@@ -86,7 +87,19 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu = SwiGLU(d_model, d_ff)
+
+    swiglu.W1.load_state_dict({
+        "W": w1_weight
+    })
+    swiglu.W2.load_state_dict({
+        "W": w2_weight
+    })
+    swiglu.W3.load_state_dict({
+        "W": w3_weight
+    })
+    return swiglu(in_features)
+    
 
 
 def run_scaled_dot_product_attention(
@@ -398,7 +411,7 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    return SwiGLU.silu(in_features)
 
 
 def run_get_batch(

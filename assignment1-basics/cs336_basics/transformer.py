@@ -64,3 +64,32 @@ class RMSNorm(nn.Module):
         
         return X.to(original_dt)
 
+
+class SwiGLU(nn.Module):
+    # X.shape = (B, d_model)
+    # W1, W3 .shape = d_ff, d_model
+    # W2 .shape = d_model, d_ff
+    def __init__(self, d_model, d_ff=None, device=None, dtype=None):
+        super().__init__()
+        self.d_ff = d_ff or 64 * round((8 * d_model // 3) / 64)
+        
+        self.W1 = Linear(d_model, self.d_ff, device=device, dtype=dtype)
+        self.W3 = Linear(d_model, self.d_ff, device=device, dtype=dtype)
+        self.W2 = Linear(self.d_ff, d_model, device=device, dtype=dtype)
+
+    @staticmethod
+    def silu(X):
+        return X * torch.sigmoid(X)
+    
+    def forward(self, X):
+        # 𝑊2 (SiLU(𝑊1 𝑥) ⊙ 𝑊3 𝑥)
+        # T1        T2      T3  
+        
+        W1x = self.W1(X)
+        SILU = SwiGLU.silu(W1x)
+        W3x = self.W3(X)
+        inp = SILU * W3x
+        return self.W2(inp)
+    
+    
+    
