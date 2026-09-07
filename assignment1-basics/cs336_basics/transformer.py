@@ -125,3 +125,11 @@ def softmax(v: torch.Tensor, dim=-1) -> torch.Tensor:
     v = v - v_max
     ev = torch.exp(v)
     return ev / ev.sum(dim=dim, keepdim=True)
+
+def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Tensor | None=None) -> torch.Tensor:
+    qkt_scaled = einsum(Q, K / math.sqrt(Q.shape[-1]), "... T1 C,... T2 C -> ... T1 T2")
+    if mask is not None:
+        dtype = qkt_scaled.dtype
+        smallest_value = torch.finfo(dtype).min 
+        qkt_scaled = qkt_scaled.masked_fill(~mask, smallest_value)
+    return softmax(qkt_scaled, dim=-1) @ V
