@@ -48,8 +48,8 @@ class Tokenizer():
         a file is a big json file dictionary
         """
         with open(vocab_filepath, 'r') as f:
-            vocab: dict[int, bytes] = json.load(f)
-        vocab = {int(k): bytes.fromhex(v) for k, v in vocab.items()}
+            vocab_s: dict[int, str] = json.load(f)
+        vocab = {int(k): bytes.fromhex(v) for k, v in vocab_s.items()}
         with open(merges_filepath) as f:
             merge_strs: list[tuple[str, str]] = json.load(f)
         merges: list[tuple[bytes, bytes]] = [(bytes.fromhex(l), bytes.fromhex(r)) for l, r in merge_strs]
