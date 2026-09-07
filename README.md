@@ -54,7 +54,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `rmsnorm` Root Mean Square Layer Normalization (1 pt)
 - [x] `positionwise_feedforward` Implement the position-wise feed-forward network (2 pts)
 - [x] `rope` Implement RoPE (2 pts)
-- [ ] `softmax` Implement softmax (1 pt)
+- [x] `softmax` Implement softmax (1 pt)
 - [ ] `scaled_dot_product_attention` Implement scaled dot-product attention (5 pts)
 - [ ] `multihead_self_attention` Implement causal multi-head self-attention (5 pts)
 - [ ] `transformer_block` Implement the Transformer block (3 pts)
