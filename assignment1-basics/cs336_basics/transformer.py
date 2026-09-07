@@ -118,3 +118,10 @@ class RotaryPositionalEmbedding(nn.Module):
         x = einsum(self.R[token_positions], x, "... seq_len n_pairs r c, ... seq_len n_pairs c-> ... seq_len n_pairs r")
         x = rearrange(x, "... seq_len n_pairs r -> ... seq_len (n_pairs r)")
         return x
+    
+def softmax(v: torch.Tensor, dim=-1) -> torch.Tensor:
+    # V has arbitrary dims
+    v_max = torch.amax(v, dim=dim, keepdim=True)
+    v = v - v_max
+    ev = torch.exp(v)
+    return ev / ev.sum(dim=dim, keepdim=True)
