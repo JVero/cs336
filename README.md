@@ -55,7 +55,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `positionwise_feedforward` Implement the position-wise feed-forward network (2 pts)
 - [x] `rope` Implement RoPE (2 pts)
 - [x] `softmax` Implement softmax (1 pt)
-- [ ] `scaled_dot_product_attention` Implement scaled dot-product attention (5 pts)
+- [x] `scaled_dot_product_attention` Implement scaled dot-product attention (5 pts)
 - [ ] `multihead_self_attention` Implement causal multi-head self-attention (5 pts)
 - [ ] `transformer_block` Implement the Transformer block (3 pts)
 - [ ] `transformer_lm` Implementing the Transformer LM (3 pts)
