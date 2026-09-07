@@ -3,7 +3,7 @@ import torch
 
 import math
 
-from einops import einsum
+from einops import einsum, rearrange
 
 class Linear(nn.Module):
     def __init__(self, in_features: int, out_features: int, device: torch.device | None = None, dtype=None):
@@ -93,3 +93,28 @@ class SwiGLU(nn.Module):
     
     
     
+class RotaryPositionalEmbedding(nn.Module):
+
+    
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
+        super().__init__()
+        self.theta = theta
+        self.max_seq_len = max_seq_len
+
+        i = torch.arange(max_seq_len) # max_seq_len
+        denominator = theta ** ((2 * torch.arange(1, 1+d_k//2) - 2)/d_k) # d_k / 2
+        thetas = i[:, None] / denominator[None, :] # (max_seq_len, d_k // 2)
+        Ri = torch.stack([torch.cos(thetas), -torch.sin(thetas), torch.sin(thetas), torch.cos(thetas)], dim=-1)
+
+        R = Ri.view((max_seq_len, d_k//2, 2, 2)).to(device)
+        
+        self.R = nn.Buffer(R, persistent=False)
+        
+        
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
+        # x (..., seq_len, d_k)
+        # token_positions (..., seq_len)
+        x = rearrange(x, "... seq_len (n_pairs r) -> ... seq_len n_pairs r", r=2)
+        x = einsum(self.R[token_positions], x, "... seq_len n_pairs r c, ... seq_len n_pairs c-> ... seq_len n_pairs r")
+        x = rearrange(x, "... seq_len n_pairs r -> ... seq_len (n_pairs r)")
+        return x
