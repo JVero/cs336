@@ -157,22 +157,15 @@ def run_multihead_self_attention(
     """
     msa = MSA(d_model, num_heads)
     
-    # msa.Wq.load_state_dict( {
-    #     "W": q_proj_weight
-    # })
-    # msa.Wk.load_state_dict( {
-    #     "W": k_proj_weight
-    # })
-    # msa.Wv.load_state_dict( {
-    #     "W": v_proj_weight
-    # })
-    msa.Wo.load_state_dict({
-        "W": o_proj_weight
-    })
     weights = torch.concat([q_proj_weight, k_proj_weight, v_proj_weight])
     msa.Wfused.load_state_dict({
         "W": weights
     })
+    
+    msa.Wo.load_state_dict({
+        "W": o_proj_weight
+    })
+
     return msa(in_features)
     
 
