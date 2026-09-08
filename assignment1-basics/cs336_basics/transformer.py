@@ -133,3 +133,51 @@ def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tens
         smallest_value = torch.finfo(dtype).min 
         qkt_scaled = qkt_scaled.masked_fill(~mask, smallest_value)
     return softmax(qkt_scaled, dim=-1) @ V
+
+
+class MultiheadSelfAttention(nn.Module):
+    def __init__(self, d_model, n_heads, dtype=None, device=None):
+        super().__init__()
+        # x: (batch, seq_len, d_model)
+        self.Wq = Linear(d_model, d_model, dtype=dtype, device=device)
+        self.Wk = Linear(d_model, d_model, dtype=dtype, device=device)
+        self.Wv = Linear(d_model, d_model, dtype=dtype, device=device)
+        self.Wo = Linear(d_model, d_model, dtype=dtype, device=device)
+        
+        self.n_heads = n_heads
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:        
+        Q = rearrange(self.Wq(x), "... seq_len (h d_k) -> ... h seq_len d_k", h = self.n_heads)
+        K = rearrange(self.Wk(x), "... seq_len (h d_k) -> ... h seq_len d_k", h = self.n_heads)
+        V = rearrange(self.Wv(x), "... seq_len (h d_k) -> ... h seq_len d_k", h = self.n_heads)
+        
+        mask = torch.ones(Q.shape[-2], Q.shape[-2], dtype=torch.bool, device=x.device).tril()
+        
+        attn = scaled_dot_product_attention(Q, K, V, mask=mask)
+        attn = rearrange(attn, "... h seq_len d_k -> ... seq_len (h d_k)")
+        
+        return self.Wo(attn)
+    
+class FusedMultiheadSelfAttention(nn.Module):
+    def __init__(self, d_model, n_heads, dtype=None, device=None):
+        super().__init__()
+        # x: (batch, seq_len, d_model)
+        
+        self.Wfused = Linear(d_model, 3*d_model, dtype=dtype, device=device)
+        
+        self.Wo = Linear(d_model, d_model, dtype=dtype, device=device)
+        
+        self.n_heads = n_heads
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:        
+        Fused = rearrange(self.Wfused(x), "... seq_len (unfused h d_k) -> unfused ... h seq_len d_k", h=self.n_heads, unfused=3)
+        Q = Fused[0]
+        K = Fused[1]
+        V = Fused[2]
+        
+        mask = torch.ones(Q.shape[-2], Q.shape[-2], dtype=torch.bool, device=x.device).tril()
+        
+        attn = scaled_dot_product_attention(Q, K, V, mask=mask)
+        attn = rearrange(attn, "... h seq_len d_k -> ... seq_len (h d_k)")
+        
+        return self.Wo(attn)
