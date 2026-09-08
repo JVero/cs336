@@ -61,7 +61,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `transformer_lm` Implementing the Transformer LM (3 pts)
 - [x] `transformer_accounting` Transformer LM resource accounting (5 pts)
 - [x] `cross_entropy` Implement cross-entropy (1 pt)
-- [ ] `learning_rate_tuning` Tuning the learning rate (1 pt)
+- [x] `learning_rate_tuning` Tuning the learning rate (1 pt)
 - [ ] `adamw` Implement AdamW (2 pts)
 - [ ] `adamw_accounting` Resource accounting for training with AdamW (2 pts)
 - [ ] `learning_rate_schedule` Implement cosine learning rate schedule with warmup (1 pt)

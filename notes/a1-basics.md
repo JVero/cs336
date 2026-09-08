@@ -309,12 +309,58 @@ Based on plotting the flops per layer, the Position-Wise Linear layers take up t
 ## cross_entropy
 
 Implement cross-entropy (1 point)
-
+done
 
 ## learning_rate_tuning
 
 Tuning the learning rate (1 point)
+def test_lrs():
+    lrs = [1e1, 1e2, 1e3]
+    for lr in lrs:
+        print(f'{6*"="}{lr}{6*"="}')
+        weights = torch.nn.Parameter(5 * torch.randn((10, 10)))
+        opt = SGD([weights], lr=1)    
+        for t in range(10):
+            opt.zero_grad()
+            loss = (weights**2).mean()
+            loss.backward()
+            opt.step()    
 
+======10.0======
+24.02
+15.37
+11.33
+8.87
+7.18
+5.95
+5.02
+4.29
+3.71
+3.23
+======100.0======
+24.62
+24.62
+4.22
+0.1
+0.0
+0.0
+0.0
+0.0
+0.0
+0.0
+======1000.0======
+23.16
+8360.06
+1443913.25
+160619936.0
+13010212864.0
+821093466112.0
+42152256077824.0
+1813570341830656.0
+6.684433266927206e+16
+2.146445846462333e+18
+
+The runs start at a similar initial error, but have very different behaviors afterwards. lr=10 slowly approaches the value while never overshooting, 100 overshoots once but then converges nicely to the exact solution, and 1000 immediately diverges into nonsense with no hope of ever getting back.
 
 ## adamw
 
