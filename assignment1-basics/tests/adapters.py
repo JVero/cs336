@@ -122,6 +122,7 @@ def run_scaled_dot_product_attention(
     """
     return scaled_dot_product_attention(Q, K, V, mask=mask)
 
+from cs336_basics.transformer import FusedMultiheadSelfAttention as MSA
 
 def run_multihead_self_attention(
     d_model: int,
@@ -154,8 +155,26 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_model"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
-
+    msa = MSA(d_model, num_heads)
+    
+    # msa.Wq.load_state_dict( {
+    #     "W": q_proj_weight
+    # })
+    # msa.Wk.load_state_dict( {
+    #     "W": k_proj_weight
+    # })
+    # msa.Wv.load_state_dict( {
+    #     "W": v_proj_weight
+    # })
+    msa.Wo.load_state_dict({
+        "W": o_proj_weight
+    })
+    weights = torch.concat([q_proj_weight, k_proj_weight, v_proj_weight])
+    msa.Wfused.load_state_dict({
+        "W": weights
+    })
+    return msa(in_features)
+    
 
 def run_multihead_self_attention_with_rope(
     d_model: int,
