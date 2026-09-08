@@ -340,6 +340,8 @@ def run_transformer_block(
     
     return trans(in_features)
 
+from cs336_basics.transformer import TransformerLM
+
 def run_transformer_lm(
     vocab_size: int,
     context_length: int,
@@ -419,8 +421,30 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    rope = RotaryPositionalEmbedding(rope_theta, d_model // num_heads, context_length)
 
+    TLM = TransformerLM(d_model, num_heads, d_ff, vocab_size, context_length, num_layers, rope=rope)
+    TLM.embedding.load_state_dict({
+        "W": weights["token_embeddings.weight"]
+    })
+    for i in range(num_layers):
+        w = torch.concat([weights[f"layers.{i}.attn.q_proj.weight"], weights[f"layers.{i}.attn.k_proj.weight"],weights[f"layers.{i}.attn.v_proj.weight"]])
+        TLM.transformer_layers[i].load_state_dict( {
+            "rms1.g": weights[f"layers.{i}.ln1.weight"],
+            "msa.Wfused.W": w,
+            "msa.Wo.W": weights[f"layers.{i}.attn.output_proj.weight"],
+            "ffn.W1.W": weights[f"layers.{i}.ffn.w1.weight"],
+            "ffn.W2.W": weights[f"layers.{i}.ffn.w2.weight"],
+            "ffn.W3.W": weights[f"layers.{i}.ffn.w3.weight"],
+            "rms2.g": weights[f"layers.{i}.ln2.weight"],
+        })
+    TLM.norm.load_state_dict({
+        "g": weights[f"ln_final.weight"]
+    })
+    TLM.linear.load_state_dict({
+        "W": weights[f"lm_head.weight"]
+    })
+    return TLM(in_indices)
 from cs336_basics.transformer import RMSNorm
 
 def run_rmsnorm(

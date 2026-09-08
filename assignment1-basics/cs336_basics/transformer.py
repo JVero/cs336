@@ -176,4 +176,21 @@ class Transformer(nn.Module):
         X = X + self.msa(self.rms1(X))
         return X + self.ffn(self.rms2(X))
         
-    
+class TransformerLM(nn.Module):
+    def __init__(self, d_model, num_heads, d_ff,  vocab_size: int, context_length: int, 
+                 num_layers: int, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None):
+        super().__init__()
+        if rope is None:
+            theta = 10_000
+            rope = RotaryPositionalEmbedding(theta, d_model // num_heads, context_length, device=device)
+        self.embedding = Embedding(vocab_size, d_model, device=device, dtype=dtype)
+        self.transformer_layers = nn.Sequential(*[Transformer(d_model, num_heads, d_ff, rope, dtype=dtype, device=device) for _ in range(num_layers)])
+        self.norm = RMSNorm(d_model, device=device,dtype=dtype)
+        self.linear = Linear(d_model, vocab_size, device=device, dtype=dtype)
+        
+    def forward(self, X):
+        X = self.embedding(X)
+        for layer in self.transformer_layers:
+            X = layer(X)
+        X = self.linear(self.norm(X))
+        return X
