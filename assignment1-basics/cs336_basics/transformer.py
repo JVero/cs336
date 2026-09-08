@@ -168,10 +168,9 @@ class Transformer(nn.Module):
     def __init__(self, d_model, num_heads, d_ff, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None):
         super().__init__()
         self.rms1 = RMSNorm(d_model, device=device, dtype=dtype)
-
         self.msa = FusedMultiheadSelfAttention(d_model, num_heads, rope=rope, dtype=dtype, device=device)
         self.rms2 = RMSNorm(d_model, device=device, dtype=dtype)
-        self.ffn = SwiGLU(d_model, d_ff)
+        self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
     def forward(self, X) -> torch.Tensor:
         X = X + self.msa(self.rms1(X))
         return X + self.ffn(self.rms2(X))
@@ -194,3 +193,181 @@ class TransformerLM(nn.Module):
             X = layer(X)
         X = self.linear(self.norm(X))
         return X
+    
+def transformer_accounting():
+    vocab_size = 50_257
+    context_length = 1_024 # 
+    num_layers = 48
+    d_model = 1_600
+    num_heads = 25
+    d_ff = 4_288
+    
+    n_params = 0    
+    
+    # Transformer Layers
+    def get_transformer_params():
+        n_params = 0
+        # rms1
+        n_params += d_model
+        
+        # FMHSA
+        n_params += 3 * d_model * d_model
+        n_params += d_model * d_model
+        
+        # rms2
+        n_params += d_model
+        
+        # SwiGLU
+        n_params += 3 * d_model * d_ff
+        return n_params
+    
+    n_params += num_layers * get_transformer_params()
+    
+    # RMS Layer
+    n_params += d_model
+    
+    # Linear Layer
+    n_params += d_model * vocab_size
+
+    model = TransformerLM(d_model, num_heads, d_ff, vocab_size, context_length, num_layers, device="meta")
+    print(sum(p.numel() for p in model.parameters()))
+
+    return n_params # Returns 1640452800
+
+def calculate_flops(vocab_size=50_257,
+                    context_length=1_024,
+                    num_layers = 48,
+                    d_model = 1_600,
+                    num_heads = 25,
+                    d_ff = 4_288):
+    n_flops = 0
+    result = {}
+    # (context_length, d_model)
+    
+    # Transformer Layers
+    def get_transformer_flops():
+        result = {}
+        n_flops = 0
+        # Wq, Wk, Wv
+        result["Wqkv"] = 3 * (2 * context_length * d_model * d_model)
+        n_flops += result["Wqkv"]
+        
+        result["QKt"] = 2 * context_length * d_model * context_length
+        # Q Kt (B, T, C) (B, C, T)
+        n_flops += result["QKt"]
+        
+        result["QKt V"] = 2 * context_length * context_length * d_model
+        # QKt V (T, T) (T, C) -> (T, C)
+        n_flops += result["QKt V"]
+        
+        result["(QKt V) Wo"] = 2 * context_length * d_model * d_model
+        # (QKt V) Wo (T, C) (C, C) -> (T, C)
+        n_flops += result["(QKt V) Wo"]
+        
+        # Linear x 3
+        result["Linear"] = 3 * 2 * context_length * d_model * d_ff
+        n_flops += result["Linear"]
+        return n_flops, result
+    
+    flops, result['transformer_per_layer'] = get_transformer_flops()
+    # (T, C)
+    n_flops += num_layers * flops
+    
+    result["FinalLinear"] = 2 * context_length * d_model * vocab_size
+    # final linear (T, C) (C, vocab_size)
+    n_flops += result["FinalLinear"]
+    
+    return n_flops, result
+
+if __name__ == "__main__":
+    from matplotlib import pyplot as plt
+    
+    # Part C
+    num_layers = 48
+    flops, result = calculate_flops(num_layers=num_layers)
+    transformer = result.pop("transformer_per_layer")
+    for key in transformer:
+        transformer[key] *= num_layers 
+    bars = result | transformer
+    total = sum(bars.values())
+    for b in bars:
+        bars[b] = round(bars[b] * 100/total, 2)
+    
+    print(f"num_layers: {num_layers} : {flops}", bars) # 3_516_769_894_400
+    plt.bar(bars.keys(), bars.values())
+    plt.title("Part C")
+    plt.show()
+    
+    # Part D - GPT-2 Small
+    num_layers = 12
+    d_model = 768
+    num_heads = 12
+    flops, result = calculate_flops(num_layers=num_layers, d_model=d_model, num_heads=num_heads, d_ff=2048)
+    transformer = result.pop("transformer_per_layer")
+    for key in transformer:
+        transformer[key] *= num_layers
+    bars = result | transformer
+    total = sum(bars.values())
+    for b in bars:
+        bars[b] = round(bars[b] * 100/total, 2)
+    print(f"GPT-2 Small", flops, bars) # 291_648_307_200
+    
+    plt.bar(bars.keys(), bars.values())
+    plt.title("GPT-2 Small")
+    plt.show()
+    
+    # Part D - GPT-2 Medium
+    num_layers = 24
+    d_model = 1024
+    num_heads = 16
+    flops, result = calculate_flops(num_layers=num_layers, d_model=d_model, num_heads=num_heads, d_ff=2752)
+    transformer = result.pop("transformer_per_layer")
+    for key in transformer:
+        transformer[key] *= num_layers 
+    bars = result | transformer
+    total = sum(bars.values())
+    for b in bars:
+        bars[b] = round(bars[b] * 100/total, 2)
+    
+    print("GPT-2 Medium ", flops, bars) # 830_172_299_264
+    plt.bar(bars.keys(), bars.values())
+    plt.title("GPT-Medium")
+    plt.show()
+    
+    # Part D - GPT-2 large
+    num_layers = 36
+    d_model = 1280
+    num_heads = 20
+    flops, result = calculate_flops(num_layers=num_layers, d_model=d_model, num_heads=num_heads, d_ff=3392)
+    transformer = result.pop("transformer_per_layer")
+    for key in transformer:
+        transformer[key] *= num_layers 
+    bars = result | transformer
+    total = sum(bars.values())
+    for b in bars:
+        bars[b] = round(bars[b] * 100/total, 2)
+    
+    print("GPT-2 Large" , flops, bars) # 131_745_710_080
+    plt.bar(bars.keys(), bars.values())
+    plt.title("GPT-2 Large")
+    plt.show()
+    
+    # Part E
+    num_layers = 48
+    context_length = 16_384
+    flops, result = calculate_flops(num_layers=num_layers,context_length=context_length)
+    transformer = result.pop("transformer_per_layer")
+    print("Part E", flops)
+    for key in transformer:
+        transformer[key] *= num_layers 
+    bars = result | transformer
+    
+    total = sum(bars.values())
+    for b in bars:
+        bars[b] = round(bars[b] * 100/total, 2)
+    
+    print("Part E" , flops, bars) # 133_577_729_638_400
+    plt.bar(bars.keys(), bars.values())
+    plt.title("GPT-2 XL w/ long context")
+    plt.show()
+    
