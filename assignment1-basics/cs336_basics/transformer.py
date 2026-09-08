@@ -111,9 +111,11 @@ class RotaryPositionalEmbedding(nn.Module):
         self.R = nn.Buffer(R, persistent=False)
         
         
-    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor | None = None) -> torch.Tensor:
         # x (..., seq_len, d_k)
         # token_positions (..., seq_len)
+        if token_positions is None:
+            token_positions = torch.arange(x.shape[-2], device=x.device)
         x = rearrange(x, "... seq_len (n_pairs r) -> ... seq_len n_pairs r", r=2)
         x = einsum(self.R[token_positions], x, "... seq_len n_pairs r c, ... seq_len n_pairs c-> ... seq_len n_pairs r")
         x = rearrange(x, "... seq_len n_pairs r -> ... seq_len (n_pairs r)")
@@ -135,7 +137,7 @@ def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tens
     return softmax(qkt_scaled, dim=-1) @ V
     
 class FusedMultiheadSelfAttention(nn.Module):
-    def __init__(self, d_model, n_heads, dtype=None, device=None):
+    def __init__(self, d_model, num_heads, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None):
         super().__init__()
         # x: (batch, seq_len, d_model)
         
@@ -143,17 +145,35 @@ class FusedMultiheadSelfAttention(nn.Module):
         
         self.Wo = Linear(d_model, d_model, dtype=dtype, device=device)
         
-        self.n_heads = n_heads
+        self.num_heads = num_heads
+        self.rope = rope
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:        
-        Fused = rearrange(self.Wfused(x), "... seq_len (unfused h d_k) -> unfused ... h seq_len d_k", h=self.n_heads, unfused=3)
+    def forward(self, x: torch.Tensor, token_positions=None) -> torch.Tensor:        
+        Fused = rearrange(self.Wfused(x), "... seq_len (unfused h d_k) -> unfused ... h seq_len d_k", h=self.num_heads, unfused=3)
         Q = Fused[0]
         K = Fused[1]
         V = Fused[2]
         
         mask = torch.ones(Q.shape[-2], Q.shape[-2], dtype=torch.bool, device=x.device).tril()
-        
+        if self.rope is not None:
+            Q = self.rope(Q, token_positions)
+            K = self.rope(K, token_positions)
         attn = scaled_dot_product_attention(Q, K, V, mask=mask)
+
         attn = rearrange(attn, "... h seq_len d_k -> ... seq_len (h d_k)")
         
         return self.Wo(attn)
+
+class Transformer(nn.Module):
+    def __init__(self, d_model, num_heads, d_ff, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None):
+        super().__init__()
+        self.rms1 = RMSNorm(d_model, device=device, dtype=dtype)
+
+        self.msa = FusedMultiheadSelfAttention(d_model, num_heads, rope=rope, dtype=dtype, device=device)
+        self.rms2 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ffn = SwiGLU(d_model, d_ff)
+    def forward(self, X) -> torch.Tensor:
+        X = X + self.msa(self.rms1(X))
+        return X + self.ffn(self.rms2(X))
+        
+    
