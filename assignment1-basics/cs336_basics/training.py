@@ -54,7 +54,7 @@ class AdamW(torch.optim.Optimizer):
     def step(self, closure: Optional[Callable] = None):
         loss = None if closure is None else closure()
         for group in self.param_groups:
-            gamma, lr, b1, b2, eps = (group.get(k) for k in ["gamma", "lr", "b1", "b2", "eps"])
+            gamma, lr, b1, b2, eps = (group[k] for k in ["gamma", "lr", "b1", "b2", "eps"])
             for p in group["params"]:
                 if p.grad is None:
                     continue
