@@ -59,7 +59,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `multihead_self_attention` Implement causal multi-head self-attention (5 pts)
 - [x] `transformer_block` Implement the Transformer block (3 pts)
 - [x] `transformer_lm` Implementing the Transformer LM (3 pts)
-- [ ] `transformer_accounting` Transformer LM resource accounting (5 pts)
+- [x] `transformer_accounting` Transformer LM resource accounting (5 pts)
 - [ ] `cross_entropy` Implement cross-entropy (1 pt)
 - [ ] `learning_rate_tuning` Tuning the learning rate (1 pt)
 - [ ] `adamw` Implement AdamW (2 pts)
