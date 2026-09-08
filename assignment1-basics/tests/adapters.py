@@ -168,6 +168,7 @@ def run_multihead_self_attention(
 
     return msa(in_features)
     
+from cs336_basics.transformer import RotaryPositionalEmbedding
 
 def run_multihead_self_attention_with_rope(
     d_model: int,
@@ -206,10 +207,20 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_model"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    rope = RotaryPositionalEmbedding(theta, d_model//num_heads, max_seq_len)
+    msa = MSA(d_model, num_heads, rope=rope)
+    
+    weights = torch.concat([q_proj_weight, k_proj_weight, v_proj_weight])
+    msa.Wfused.load_state_dict({
+        "W": weights
+    })
+    
+    msa.Wo.load_state_dict({
+        "W": o_proj_weight
+    })
 
-from cs336_basics.transformer import RotaryPositionalEmbedding
-
+    return msa(in_features, token_positions)
+    
 def run_rope(
     d_k: int,
     theta: float,
@@ -231,6 +242,8 @@ def run_rope(
     """
     rope = RotaryPositionalEmbedding(theta, d_k, max_seq_len)
     return rope(in_query_or_key, token_positions)
+
+from cs336_basics.transformer import Transformer
 
 def run_transformer_block(
     d_model: int,
@@ -302,8 +315,30 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    rope = RotaryPositionalEmbedding(theta, d_model//num_heads, max_seq_len)
+    trans = Transformer(d_model, num_heads, d_ff, rope=rope)
+    
+    w = torch.concat([weights["attn.q_proj.weight"], weights["attn.k_proj.weight"], weights["attn.v_proj.weight"]])
 
+    trans.msa.Wfused.load_state_dict({
+        "W": w
+    })
+    trans.msa.Wo.load_state_dict({
+        "W": weights["attn.output_proj.weight"]
+    })
+    trans.rms1.load_state_dict({
+        "g": weights["ln1.weight"]
+    })
+    trans.ffn.load_state_dict({
+        "W1.W": weights["ffn.w1.weight"],
+        "W2.W": weights["ffn.w2.weight"],
+        "W3.W": weights["ffn.w3.weight"] 
+    })
+    trans.rms2.load_state_dict({
+        "g": weights["ln2.weight"]
+    })
+    
+    return trans(in_features)
 
 def run_transformer_lm(
     vocab_size: int,
