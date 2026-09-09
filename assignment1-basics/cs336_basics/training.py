@@ -82,8 +82,6 @@ def test_lrs():
             loss.backward()
             opt.step()    
 
-from cs336_basics.transformer import calculate_flops, TransformerLM
-
 def get_activations_count(): # gpt2-xl
     batch_size = 1
     n_layers = 48
@@ -112,3 +110,14 @@ def learning_rate_scheduler(t, a_max, a_min, Tw, Tc):
         a_t = a_min
         
     return a_t
+
+def gradient_clipping(parameters: Iterable[torch.nn.Parameter], M, eps=1e-6):
+    parameters = list(parameters)
+    data = torch.cat([p.grad.flatten() for p in parameters if p.grad is not None])
+    l2 = data.norm(2)
+    frac = M / (l2 + eps)
+    if frac > 1:
+        return
+    for param in parameters:
+        if param.grad is not None:
+            param.grad *=  frac
