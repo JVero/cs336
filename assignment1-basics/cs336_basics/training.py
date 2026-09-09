@@ -1,6 +1,6 @@
 import torch
 from collections.abc import Callable, Iterable
-from typing import Optional
+from typing import Optional, Tuple
 import math
 
 def cross_entropy(logits: torch.Tensor, targets: torch.Tensor):
@@ -121,3 +121,11 @@ def gradient_clipping(parameters: Iterable[torch.nn.Parameter], M, eps=1e-6):
     for param in parameters:
         if param.grad is not None:
             param.grad *=  frac
+
+def get_batch(arr, batch_size, context_length: int, device=None) -> Tuple[torch.Tensor, torch.Tensor]:
+    idx = torch.randint(0, len(arr) - context_length, [batch_size], dtype=torch.long)
+    offsets = torch.arange(context_length, dtype=torch.long)
+    ix = idx[:, None] + offsets[None, :]
+    x, y = arr[ix], arr[ix+1]
+    
+    return torch.as_tensor(x, device=device, dtype=torch.long), torch.as_tensor(y, device=device, dtype=torch.long)
