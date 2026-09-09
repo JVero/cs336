@@ -1,7 +1,11 @@
 import torch
 from collections.abc import Callable, Iterable
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TypeAlias, IO
+import typing
 import math
+import os
+from pathlib import Path
+import io
 
 def cross_entropy(logits: torch.Tensor, targets: torch.Tensor):
 
@@ -129,3 +133,31 @@ def get_batch(arr, batch_size, context_length: int, device=None) -> Tuple[torch.
     x, y = arr[ix], arr[ix+1]
     
     return torch.as_tensor(x, device=device, dtype=torch.long), torch.as_tensor(y, device=device, dtype=torch.long)
+
+
+def save_checkpoint(model: torch.nn.Module,
+                    optimizer: torch.optim.Optimizer, iteration: int,
+                    out: str| os.PathLike | typing.BinaryIO | typing.IO[bytes]):
+    d = {"model": model.state_dict(),
+         "optimizer": optimizer.state_dict(), "iteration": iteration}
+    if isinstance(out, (str, os.PathLike)): # Named file
+        out_tmp = Path(out).with_name(Path(out).name + ".tmp")
+        try:
+            torch.save(d, out_tmp)
+        except Exception as E:
+            out_tmp.unlink(missing_ok = True)
+            raise
+        os.replace(out_tmp, out)
+    elif isinstance(out, (io.IOBase)): # File object handle
+        torch.save(d, out)
+    else: # Unsupported thing
+        raise TypeError(type(out).__name__)
+        
+
+def load_checkpoint(src:  str| os.PathLike | typing.BinaryIO | typing.IO[bytes],
+                    model: torch.nn.Module, optimizer: torch.optim.Optimizer) -> int:
+    d = torch.load(src, map_location="cpu")
+    model.load_state_dict(d["model"])
+    optimizer.load_state_dict(d["optimizer"])
+    return d["iteration"]
+    
