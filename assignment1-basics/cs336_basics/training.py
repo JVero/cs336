@@ -26,7 +26,7 @@ class SGD(torch.optim.Optimizer):
         defaults = {"lr": lr}
         super().__init__(params, defaults)
         
-    def step(self, closure: Optional[Callable] = None):
+    def step(self, closure: Optional[Callable] = None): # type: ignore
         loss = None if closure is None else closure()
         for group in self.param_groups:
             lr = group["lr"] # Get the learning rate.
@@ -55,7 +55,7 @@ class AdamW(torch.optim.Optimizer):
                     "eps": eps}
         super().__init__(params, defaults)
             
-    def step(self, closure: Optional[Callable] = None):
+    def step(self, closure: Optional[Callable] = None): # type: ignore
         loss = None if closure is None else closure()
         for group in self.param_groups:
             gamma, lr, b1, b2, eps = (group[k] for k in ["gamma", "lr", "b1", "b2", "eps"])
