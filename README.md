@@ -68,7 +68,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `gradient_clipping` Implement gradient clipping (1 pt)
 - [x] `data_loading` Implement data loading (2 pts)
 - [x] `checkpointing` Implement model checkpointing (1 pt)
-- [ ] `training_together` Put it together (4 pts)
+- [x] `training_together` Put it together (4 pts)
 - [ ] `decoding` Decoding (3 pts)
 - [ ] `experiment_log` Experiment logging (3 pts)
 - [ ] `learning_rate` Tune the learning rate (2 B200 hrs) (3 pts)

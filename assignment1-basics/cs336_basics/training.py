@@ -115,7 +115,7 @@ def learning_rate_scheduler(t, a_max, a_min, Tw, Tc):
         
     return a_t
 
-def gradient_clipping(parameters: Iterable[torch.nn.Parameter], M, eps=1e-6):
+def gradient_clipping(parameters: Iterable[torch.nn.Parameter], M: float, eps=1e-6):
     parameters = list(parameters)
     data = torch.cat([p.grad.flatten() for p in parameters if p.grad is not None])
     l2 = data.norm(2)

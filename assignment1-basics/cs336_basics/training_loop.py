@@ -1,5 +1,5 @@
 from cs336_basics.transformer import TransformerLM, RotaryPositionalEmbedding
-from cs336_basics.training import AdamW, save_checkpoint, load_checkpoint, learning_rate_scheduler, cross_entropy, get_batch
+from cs336_basics.training import AdamW, save_checkpoint, load_checkpoint, learning_rate_scheduler, cross_entropy, get_batch, gradient_clipping
 
 import argparse
 from cs336_basics.default_configs import configs
@@ -12,6 +12,7 @@ from datetime import datetime
 import pathlib
 import json
 import os
+import time
 
 parser = argparse.ArgumentParser()
 
@@ -55,10 +56,13 @@ parser.add_argument('--a_max', type=float, default=1)
 parser.add_argument('--a_min', type=float, default=0.1)
 parser.add_argument('--Tw_frac', type=float, default=0.01, help="Fraction of the run warmup")
 
+parser.add_argument('--M', type=float, default=1, help="Threshold for gradient clipping")
+
 # Training hyperparameters
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--num_steps", type=int, default=1) # without specifying, I'm just seeing if the loop is healthy
 parser.add_argument("--checkpoint_interval", type=int)
+parser.add_argument("--log_interval", type=int, default=25)
 
 # Persistence flags
 parser.add_argument("--runs_dir", type=str, default="runs") # Obviously str, but would prefer explicit
@@ -66,7 +70,9 @@ parser.add_argument("--label", type=str)
 
 parser.add_argument("--train_dir", type=str, default="data")
 parser.add_argument("--train_data", type=str, required=True)
-parser.add_argument("--val_data", type=str)
+parser.add_argument("--val_dir", type=str, default="data")
+parser.add_argument("--val_data", type=str, required=True)
+parser.add_argument("--val_num_batches", type=int, default=10)
 
 parser.add_argument("--rng_seed", type=int, default=0)
 
@@ -113,10 +119,11 @@ if __name__ == "__main__":
     
     train_dir = pathlib.Path(args.train_dir)
     train_data: str = args.train_data
-    val_data: str | None = args.val_data
+    val_dir = pathlib.Path(args.val_dir)
+    val_data: str = args.val_data
     
     X_train = np.load(train_dir / train_data, mmap_mode="r")
-    
+    X_valid = np.load(val_dir / val_data, mmap_mode="r")
     empirical_vocab_size = 1+np.max(X_train)
     assert lm_vals['vocab_size'] >= empirical_vocab_size, f"{lm_vals['vocab_size']} < {empirical_vocab_size}"
     
@@ -126,26 +133,74 @@ if __name__ == "__main__":
     optimizer = AdamW(model.parameters(), **optim_vals)
     
     num_steps = args.num_steps
+    padding = len(str(num_steps))
+
     batch_size = args.batch_size
     context_length = args.context_length
     device = args.device
     checkpoint_interval = max(1, args.checkpoint_interval or num_steps // 10) # checkpoint every 10%
+    log_interval = args.log_interval
     
-    
-    save_checkpoint(model, optimizer, 1, run_dir / "initial.pt")
+    save_checkpoint(model, optimizer, 0, run_dir / "initial.pt")
     load_checkpoint( run_dir / "initial.pt", model, optimizer)
     os.remove(run_dir / "initial.pt")
-
-    a_max, a_min= args.a_max, args.a_min
-    Tw = round(args.Tw_frac * num_steps)
     
-    for step in range(num_steps):
-        optimizer.zero_grad()
-        X, Y = get_batch(X_train, batch_size, context_length, device)
-        multiplier = learning_rate_scheduler(step, a_max, a_min, Tw, num_steps)
-        for group in optimizer.param_groups:
-            group["lr"] = args.lr * multiplier
-        y_pred = model(X)
-        loss = cross_entropy(y_pred, Y)
-        loss.backward()
-        optimizer.step()
+    metrics_headers = ",".join(["step","training_loss","validation_loss","lr","steps per second"]) + "\n"
+    print(metrics_headers, end="", flush=True)
+    with open(run_dir / "metrics.csv", "w+") as f:
+        f.write(metrics_headers)
+    a_max, a_min = args.a_max, args.a_min
+    M = args.M
+    Tw = round(args.Tw_frac * num_steps)
+    prev_time = time.time()
+    try:
+        for step in range(num_steps):
+            optimizer.zero_grad()
+            X, Y = get_batch(X_train, batch_size, context_length, device)
+            multiplier = learning_rate_scheduler(step, a_max, a_min, Tw, num_steps)
+            for group in optimizer.param_groups:
+                group["lr"] = args.lr * multiplier
+            y_pred = model(X)
+            loss = cross_entropy(y_pred, Y)
+            loss.backward()
+            gradient_clipping(model.parameters(), M)
+            
+            # Checkpointing 
+            if step % checkpoint_interval == 0 and step != 0:
+                save_checkpoint(model, optimizer, step, run_dir / f"ckpt_{step:0{padding}}.pt")
+                ckpts = sorted(list(run_dir.glob("ckpt_*.pt")))
+                ckpts = ckpts[:-3]
+                for ckpt in ckpts:
+                    ckpt.unlink()
+            # Logging
+            if step % log_interval == 0:    
+                with torch.no_grad():
+                    cur_time = time.time()
+                    # Get validation loss
+                    total_val_loss = 0
+                    elapsed_time = cur_time - prev_time
+                    for _ in range(args.val_num_batches):
+                        X, Y = get_batch(X_valid, batch_size, context_length, device)
+                        y_pred = model(X)
+                        valid_loss = cross_entropy(y_pred, Y)
+                        total_val_loss += valid_loss.item()
+                    avg_val_loss = total_val_loss / args.val_num_batches
+                    prev_time = cur_time
+                    steps_per_s = log_interval / elapsed_time
+                    if step == 0:
+                        steps_per_s = 0
+                    log_lr = args.lr * multiplier
+                    with open(run_dir / "metrics.csv", "a") as f:
+                        write_line = [str(round(s, 4)) for s in [step, loss.item(), avg_val_loss, log_lr, steps_per_s]]
+                        write_line[3] = str(round(log_lr, 8)) # round all but the lr
+                        log_line = ",".join(write_line)
+                        print(log_line)
+                        f.write(log_line)
+                        f.write("\n")
+            optimizer.step()
+                        
+    except KeyboardInterrupt:
+        print("Training stopped early by user. Saving checkpoint...")
+        save_checkpoint(model, optimizer, step, run_dir / "killed_run.pt")
+    else:
+        save_checkpoint(model, optimizer, num_steps, run_dir / "final_checkpoint.pt")
