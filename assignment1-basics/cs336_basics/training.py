@@ -101,7 +101,14 @@ def get_activations_count(): # gpt2-xl
     print(n_bytes) # 16356614144.0
 
 
-    
-if __name__ == "__main__":
-    get_parameter_count()
-    
+def learning_rate_scheduler(t, a_max, a_min, Tw, Tc):
+    # warmup
+    if t < Tw:
+        a_t = a_max * t / Tw
+    elif t <= Tc:
+        frac = (t - Tw)/(Tc - Tw)
+        a_t = a_min + 1/2 * (1+math.cos(frac * math.pi)) * (a_max - a_min)
+    else:
+        a_t = a_min
+        
+    return a_t

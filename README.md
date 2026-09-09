@@ -64,7 +64,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `learning_rate_tuning` Tuning the learning rate (1 pt)
 - [x] `adamw` Implement AdamW (2 pts)
 - [x] `adamw_accounting` Resource accounting for training with AdamW (2 pts)
-- [ ] `learning_rate_schedule` Implement cosine learning rate schedule with warmup (1 pt)
+- [x] `learning_rate_schedule` Implement cosine learning rate schedule with warmup (1 pt)
 - [ ] `gradient_clipping` Implement gradient clipping (1 pt)
 - [ ] `data_loading` Implement data loading (2 pts)
 - [ ] `training_together` Put it together (4 pts)
