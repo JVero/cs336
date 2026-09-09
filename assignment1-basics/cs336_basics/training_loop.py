@@ -5,6 +5,11 @@ import argparse
 from cs336_basics.default_configs import configs
 
 import torch
+import subprocess
+
+from datetime import datetime
+import pathlib
+import json
 
 parser = argparse.ArgumentParser()
 
@@ -44,18 +49,48 @@ parser.add_argument("--eps", type=float, default=1e-8)
 # Training hyperparameters
 parser.add_argument("--batch_size", type=int, default=1024)
 
+# Persistence flags
+parser.add_argument("--runs_dir", type=str, default="runs") # Obviously str, but would prefer explicit
+parser.add_argument("--label", type=str)
+
+def save_config_log(config):
+
+    current_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    current_status = subprocess.check_output(['git', 'status', '--porcelain']).decode('utf-8').strip()
+    current_patch = subprocess.check_output(['git', 'diff', 'HEAD'])
+    curr_time = datetime.now()
+    mmdd = curr_time.strftime("-%m%d-%H%M%S")
+    run_dir: pathlib.Path = pathlib.Path(config['runs_dir']) / (config['label'] + mmdd)
+    run_dir.mkdir(parents=True)
+    with open(run_dir / "diff.patch", "wb") as f:
+        f.write(current_patch)
+        
+    config["time"] = curr_time.isoformat()
+    config["git"] = {}
+    config["git"]["hash"] = current_hash
+    config["git"]["status"] = current_status
+    with open(run_dir / "config.json", "w") as f:
+        json.dump(config, f, indent=4)
+    
 if __name__ == "__main__":
     # the rest of my script
     args = parser.parse_args()
+    
+    label = args.label or args.model or "run"
+    
     lm_args = ("num_layers", "d_model", "num_heads", "vocab_size", "device", "context_length", "d_ff")
     optim_args = ("lr", "weight_decay", "betas", "eps")
     parser.set_defaults(**configs[args.model])
     args = parser.parse_args()
     lm_vals = {k: getattr(args, k) for k in lm_args}
-
-    lm_vals["d_ff"] = lm_vals.get("d_ff") or 64 * round((8 * lm_vals["d_model"] // 3) / 64)    
     
     optim_vals = {k: getattr(args, k) for k in optim_args}
+
+    lm_vals["d_ff"] = lm_vals.get("d_ff") or 64 * round((8 * lm_vals["d_model"] // 3) / 64)    
+    args.d_ff = lm_vals["d_ff"]
+    args.label = label
+    
+    save_config_log(vars(args))
     
     model = TransformerLM(**lm_vals)
     adam = AdamW(model.parameters(), **optim_vals)
