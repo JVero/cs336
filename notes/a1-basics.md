@@ -370,6 +370,71 @@ Implement AdamW (2 points)
 ## adamw_accounting
 
 Resource accounting for training with AdamW (2 points)
+AdamW stores 1 set of hyperparameters for the 1 group.
+
+*At peak memory* each parameter stores 1 gradient, optimizer state in the looped version, so only 1 set of defaults and intermediate values are loaded / calculated
+
+A & B.
+    Fleshing out the gradient math from transformer_accounting
+    num_layers * d_model + 3 * num_layers * d_model * d_model + num_layers * d_model * d_model + num_layers * d_model + 3 * num_layers * d_model * d_ff + d_model + d_model * vocab_size
+            d_model -> 2 * num_layers + 1
+d_model * d_model   -> 4 * num_layers
+d_model * d_ff      -> 3 * num_layers
+d_model * vocab_size-> 2
+
+    n_params = (2*num_layers + 1) * d_model + (12*num_layers) * d_model ** 2 + 2 * d_model*vocab_size
+
+Using this result as P
+AdamW uses P gradients, Stores 2P of its own parameters
+
+Parameters: 1,640,452,800 parameters from the model = P
+AdamW has 6,561,811,200 = 4P
+AdamW stores 4 parameters per parameter so 6.56gb of RAM from the model ->
+26.24GB total -> 53.76GB remaining
+
+Activations:
+
+MultiheadedAttention = n_layers * [
+    batch_size * T * d_model + <- rms1
+    batch_size * 3 *context_length * d_model + <- Wqkv
+    batch_size * num_heads * context_length * context_length + <- QKt
+    batch_size * num_heads * context_length * context_length + <- Softmax
+    batch_size * context_length * d_model + <- QKt V
+    batch_size * context_length * d_model + <- (QKt V) Wo
+    batch_size * 2 * context_length * d_ff + <- SwiGLU's W1 and W3
+    batch_size * context_length * d_model + <- SwiGLU's W2
+    batch_size * 2 * T * d_ff + <- SwiGLU's SILU, Sigmoid, and Elementwise Multiplication
+    batch_size * T * d_model <- rms2
+] +
+batch_size * T * d_model <- final_rms
+batch_size * T * vocab_size <- output
+batch_size * T * vocab_size <- softmax
+
+def get_activations_count(): # gpt2-xl
+    batch_size = 1
+    n_layers = 48
+    num_heads = 25
+    context_length = 1024
+    d_model = 1600
+    vocab_size = 50257
+    
+    # The equation for the number of floats is here!!
+    floats = batch_size * \
+    n_layers * 2 * num_heads * context_length * context_length + \
+    (1 + n_layers * 56/3) * context_length * d_model + \
+    2 * context_length * vocab_size
+    # The total is here!!
+    print(floats) # 4089153536
+    n_bytes = 4 * floats
+    print(n_bytes) # 16356614144
+
+80GB = 26.24GB + 16_356_614_144 bytes * batch_size
+53.76GB / 16_356_614_144 bytes = 3.28. You can fit 3 computations in a batch
+
+C. 14 * parameters of GPT-2 XL: 14 *  1,640,452,800 =  22,966,339,200 flops per step = 2.3e10. 14 comes from the number of operations in Algorithm 1
+D. peak MFU 495 teraFLOP/s. 50% MFU -> 247.5 teraFLOP/s = 2.475e14 flop/s
+ 3_516_769_894_400 * 3 * 1024 * 400,000 = 4.32e21 flop.  4.32e21 / 2.475e14 /s = 17,454,545.45s = 202 days. It would take 4,850 hours (202 days) on a single GPU, which is why people either optimize the existing implementation or buy more compute
+
 
 
 ## learning_rate_schedule
