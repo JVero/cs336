@@ -220,7 +220,8 @@ def transformer_accounting():
         # SwiGLU
         n_params += 3 * d_model * d_ff
         return n_params
-    
+    # num_layers (num_layers * d_model + 3 * num_layers * d_model * d_model + d_model * d_model + d_model + 3 * d_model * d_ff) + d_model + d_model * vocab_size
+
     n_params += num_layers * get_transformer_params()
     
     # RMS Layer
