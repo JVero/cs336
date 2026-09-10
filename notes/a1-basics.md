@@ -465,7 +465,7 @@ Decoding (3 points)
 ## experiment_log
 
 Experiment logging (3 points)
-
+To make training runs reproducible, each training loop generates a unique directory, labelled with the dataset, learning rate, and the time the training started. Inside that directory are the 3 most recent checkpoints, the final checkpoint (either the finished or the unfinished version when you press Ctrl+C) a config.json which contains all the model and optimizer hyperparameters, including the number of transformer layers, the total number of tokens trained on, the git hash the run started on, and what device type the training took place on (cuda, mps, or cpu). In addition to the git hash, we also save the patch file of all the uncommitted changes in case the repo is between commits. Finally, metrics.csv stores the steps, training loss, validation loss, time per step, and total elapsed time. Each problem's section is its own log of half-tried things. This is a record of building the scaffolding.
 
 ## learning_rate
 
