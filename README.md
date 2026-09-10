@@ -69,7 +69,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `data_loading` Implement data loading (2 pts)
 - [x] `checkpointing` Implement model checkpointing (1 pt)
 - [x] `training_together` Put it together (4 pts)
-- [ ] `decoding` Decoding (3 pts)
+- [x] `decoding` Decoding (3 pts)
 - [ ] `experiment_log` Experiment logging (3 pts)
 - [ ] `learning_rate` Tune the learning rate (2 B200 hrs) (3 pts)
 - [ ] `batch_size_experiment` Batch size variations (1 B200 hr) (1 pt)

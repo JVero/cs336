@@ -20,7 +20,6 @@ class Tokenizer():
         self.vocab = vocab 
         # bytes -> int
         self.i_vocab = {v: k for k, v in vocab.items()}
-        # print(type(self.i_vocab[list(self.i_vocab.keys())[0]])); exit() type<int>
         self.merges = merges
 
         # Breaks ties for encoding
