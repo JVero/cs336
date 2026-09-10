@@ -72,7 +72,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `decoding` Decoding (3 pts)
 - [x] `experiment_log` Experiment logging (3 pts)
 - [x] `learning_rate` Tune the learning rate (2 B200 hrs) (3 pts)
-- [ ] `batch_size_experiment` Batch size variations (1 B200 hr) (1 pt)
+- [x] `batch_size_experiment` Batch size variations (1 B200 hr) (1 pt)
 - [ ] `generate` Generate text (1 pt)
 - [ ] `layer_norm_ablation` Remove RMSNorm and train (0.5 B200 hrs) (1 pt)
 - [ ] `pre_norm_ablation` Implement post-norm and train (0.5 B200 hrs) (1 pt)
