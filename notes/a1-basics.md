@@ -470,8 +470,20 @@ Experiment logging (3 points)
 ## learning_rate
 
 Tune the learning rate (2 B200 hrs) (3 points)
+The learning rate has 3 "phases" to speak of. Way too high and you go over the cliff and the model diverges. not too high but suboptimally high, you descend the initial valley faster but the final value it settles on is higher than optimal. Too low and you eventually descend into minima but it takes many many steps (more than the steps we budgeted for in this run)
 
+To find the optimal LR, we did a log-scale sweep between 3e-4 and 1e0. HOnestly when looking at the loss curves, with a fixed step budget in the neighborhood of 5000 steps, the optimium seems to be between 0.0003 and 0.001, and to find the exact optimum we would search within that. The divergence is about 2-3 oom (100x - 1000x) higher than the best value we sampled here (lr=0.001)
+Figure in figures/LearningRateSweep.png
 
+LR | Steps | Train loss | Valid loss
+0.0003  |4975   |1.8868  |1.8245
+0.001   |4975   |1.7139  |1.6556
+0.003   |4975   |2.1836  |2.1287
+0.01    |4975   |3.0042  |2.9174
+0.03    |4975   |3.7315  |3.6282
+0.1     |525    |4.4137  |4.4639
+1.0     |225    |357.2052|359.1536
+The cliff is between 0.1 and 1, because scaling the lr by 10x there amplifies the loss by approximately 80
 ## batch_size_experiment
 
 Batch size variations (1 B200 hr) (1 point)
