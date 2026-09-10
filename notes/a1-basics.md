@@ -487,7 +487,40 @@ The cliff is between 0.1 and 1, because scaling the lr by 10x there amplifies th
 ## batch_size_experiment
 
 Batch size variations (1 B200 hr) (1 point)
+I will try batch-sizes at powers of 2
+32
+64
+The command is 
+# TEMPLATE `modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps ___ --lr 1e-3 --batch_size ___ --label bs__"`
 
+8 @ 16,000 steps
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 160000 --lr 1e-3 --batch_size 8 --label bs8"`
+
+
+16 @ 80,000 steps
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --val_num_batches 40 --num_steps 80000 --lr 1e-3 --batch_size 16 --label bs16 --log_interval 250"`
+
+TinyStoriesV2-GPT4-bs32-lr1e-3-0910-210533
+DONE 32 @ 40,000 steps
+
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label bs32"`
+
+TinyStoriesV2-GPT4-bs64-lr1e-3-0910-210541
+DONE 64 @ 20,000 steps
+
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 20000 --lr 1e-3 --batch_size 64 --label bs64"`
+
+TinyStoriesV2-GPT4-bs128-lr1e-3-0910-210613
+DOWNLOADED 128 @ 10000 steps
+
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 10000 --lr 1e-3 --batch_size 128 --label bs128"`
+
+TinyStoriesV2-GPT4-bs256-lr1e-3-0910-205026
+DONE 256 @ 5000 steps 
+
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 5000 --lr 1e-3 --batch_size 256 --label bs256"`
+
+the figures in ./figures/ BatchSizeSweepFullCurve.png and BatchSizeZoomedCurve.png, each show the losses as a function of batch size, under a fixed token budget. Bigger batches require fewer updates but more tokens. batch sizes 8-32 are  indistinguishable, 64 is where the validation loss starts to creep up, continuing with 128 and 256. Time per step increases linearly with batch_size above 32, so larger batch-sizes took less total wall time. smaller batch-sizes give the best loss outcomes at the cost of token throughput. These were all trained at lr 1e-3 so this might not be the optimal LR for each batch size. We only held it constant for this sweep
 
 ## generate
 

@@ -142,6 +142,8 @@ if __name__ == "__main__":
     batch_size = args.batch_size
     context_length = args.context_length
     device = args.device
+    if device == "cuda":
+        torch.set_float32_matmul_precision('high')
     checkpoint_interval = max(1, args.checkpoint_interval or num_steps // 10) # checkpoint every 10%
     log_interval = args.log_interval
     
