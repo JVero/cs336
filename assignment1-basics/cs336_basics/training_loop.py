@@ -81,8 +81,14 @@ def save_config_log(config):
     current_status = subprocess.check_output(['git', 'status', '--porcelain']).decode('utf-8').strip()
     current_patch = subprocess.check_output(['git', 'diff', 'HEAD'])
     curr_time = datetime.now()
-    mmdd = curr_time.strftime("-%m%d-%H%M%S")
-    run_dir: pathlib.Path = pathlib.Path(config['runs_dir']) / (config['label'] + mmdd)
+    mmdd = curr_time.strftime("%m%d-%H%M%S")
+    l = args.label or ""
+    if l != "":
+        l = f"-{l}"
+    lr_label = np.format_float_scientific(args.lr, precision=0, exp_digits=1, trim='-')
+    label_prefix = pathlib.Path(args.train_data).with_suffix("")
+    label = f"{label_prefix}{l}-lr{lr_label}-{mmdd}".replace("-train","")
+    run_dir: pathlib.Path = pathlib.Path(config['runs_dir']) / label
     run_dir.mkdir(parents=True)
     with open(run_dir / "diff.patch", "wb") as f:
         f.write(current_patch)
@@ -98,8 +104,7 @@ def save_config_log(config):
 if __name__ == "__main__":
     # the rest of my script
     args = parser.parse_args()
-    
-    label = args.label or args.model or "run"
+
     
     lm_args = ("num_layers", "d_model", "num_heads", "vocab_size", "device", "context_length", "d_ff")
     optim_args = ("lr", "weight_decay", "betas", "eps")
@@ -113,7 +118,6 @@ if __name__ == "__main__":
 
     lm_vals["d_ff"] = lm_vals.get("d_ff") or 64 * round((8 * lm_vals["d_model"] // 3) / 64)    
     args.d_ff = lm_vals["d_ff"]
-    args.label = label
     
     run_dir = save_config_log(vars(args))
     
