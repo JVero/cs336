@@ -145,7 +145,7 @@ if __name__ == "__main__":
     load_checkpoint( run_dir / "initial.pt", model, optimizer)
     os.remove(run_dir / "initial.pt")
     
-    metrics_headers = ",".join(["step","training_loss","validation_loss","lr","steps per second"]) + "\n"
+    metrics_headers = ",".join(["step","training_loss","validation_loss","lr","steps per second", "total time"]) + "\n"
     print(metrics_headers, end="", flush=True)
     with open(run_dir / "metrics.csv", "w+") as f:
         f.write(metrics_headers)
@@ -153,7 +153,12 @@ if __name__ == "__main__":
     M = args.M
     Tw = round(args.Tw_frac * num_steps)
     prev_time = time.time()
+    if device == "mps":
+        model.compile(backend="aot_eager")
+    else:
+        model.compile()
     try:
+        start_time = time.time()
         for step in range(num_steps):
             optimizer.zero_grad()
             X, Y = get_batch(X_train, batch_size, context_length, device)
@@ -176,6 +181,7 @@ if __name__ == "__main__":
             if step % log_interval == 0:    
                 with torch.no_grad():
                     cur_time = time.time()
+                    total_elapsed = cur_time - start_time
                     # Get validation loss
                     total_val_loss = 0
                     elapsed_time = cur_time - prev_time
@@ -191,7 +197,7 @@ if __name__ == "__main__":
                         steps_per_s = 0
                     log_lr = args.lr * multiplier
                     with open(run_dir / "metrics.csv", "a") as f:
-                        write_line = [str(round(s, 4)) for s in [step, loss.item(), avg_val_loss, log_lr, steps_per_s]]
+                        write_line = [str(round(s, 4)) for s in [step, loss.item(), avg_val_loss, log_lr, steps_per_s, total_elapsed]]
                         write_line[3] = str(round(log_lr, 8)) # round all but the lr
                         log_line = ",".join(write_line)
                         print(log_line)
