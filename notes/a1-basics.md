@@ -611,6 +611,9 @@ LayerNormAblationZoomed.png
 
 Implement post-norm and train (0.5 B200 hrs) (1 point)
 
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label post_norm --use_post_norm"`
+`modal volume get cs336-runs /TinyStoriesV2-GPT4-post_norm-lr1e-3-0911-030105 runs/`
+The loss curves are shown in `figures/PostNormAblation.png`. Each model has matched parameters and tokens trained on, otherwise. Postnorm trails prenorm throughout the entire run. Why? The hypothesis I've been told to think is that postnorm deforms the residual stream more than prenorm does, and so that deformation needs to be learned
 
 
 ## no_pos_emb
