@@ -165,26 +165,32 @@ class FusedMultiheadSelfAttention(nn.Module):
         return self.Wo(attn)
 
 class Transformer(nn.Module):
-    def __init__(self, d_model, num_heads, d_ff, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None):
+    def __init__(self, d_model, num_heads, d_ff, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None, ablate_rms: bool=False):
         super().__init__()
         self.rms1 = RMSNorm(d_model, device=device, dtype=dtype)
         self.msa = FusedMultiheadSelfAttention(d_model, num_heads, rope=rope, dtype=dtype, device=device)
         self.rms2 = RMSNorm(d_model, device=device, dtype=dtype)
         self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
+        if ablate_rms:
+            self.rms1 = nn.Identity()
+            self.rms2 = nn.Identity()
     def forward(self, X) -> torch.Tensor:
         X = X + self.msa(self.rms1(X))
         return X + self.ffn(self.rms2(X))
         
 class TransformerLM(nn.Module):
     def __init__(self, d_model, num_heads, d_ff,  vocab_size: int, context_length: int, 
-                 num_layers: int, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None):
+                 num_layers: int, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None, ablate_rms: bool = False):
         super().__init__()
         if rope is None:
             theta = 10_000
             rope = RotaryPositionalEmbedding(theta, d_model // num_heads, context_length, device=device)
         self.embedding = Embedding(vocab_size, d_model, device=device, dtype=dtype)
-        self.transformer_layers = nn.Sequential(*[Transformer(d_model, num_heads, d_ff, rope, dtype=dtype, device=device) for _ in range(num_layers)])
+        self.transformer_layers = nn.Sequential(*[Transformer(d_model, num_heads, d_ff, rope, dtype=dtype, device=device,ablate_rms=ablate_rms) for _ in range(num_layers)])
         self.norm = RMSNorm(d_model, device=device,dtype=dtype)
+        if ablate_rms:
+            print("ABLATING RMS")
+            self.norm = nn.Identity()
         self.linear = Linear(d_model, vocab_size, device=device, dtype=dtype)
         
     def forward(self, X):

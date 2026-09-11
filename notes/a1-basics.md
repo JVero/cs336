@@ -582,7 +582,14 @@ From that day on, Lily and Bob would read the book every day. They read it toget
 ## layer_norm_ablation
 
 Remove RMSNorm and train (0.5 B200 hrs) (1 point)
+First run `modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label ablate_rms --ablate_rms"`
 
+Get the data
+`modal volume get cs336-runs TinyStoriesV2-GPT4-ablate_rms-lr1e-3-0911-011122 ./runs`
+
+Second run `modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 4e-4 --batch_size 32 --label ablate_rms --ablate_rms_low_lr"`
+
+`modal volume get cs336-runs TinyStoriesV2-GPT4-ablate_rms_low_lr-lr4e-4-0911-011949 ./runs`
 
 ## pre_norm_ablation
 

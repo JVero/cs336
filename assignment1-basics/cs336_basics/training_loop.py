@@ -76,6 +76,8 @@ parser.add_argument("--val_num_batches", type=int, default=10)
 
 parser.add_argument("--rng_seed", type=int, default=0)
 
+parser.add_argument("--ablate_rms", action='store_true')
+
 def save_config_log(config):
     current_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
     current_status = subprocess.check_output(['git', 'status', '--porcelain']).decode('utf-8').strip()
@@ -106,7 +108,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     
-    lm_args = ("num_layers", "d_model", "num_heads", "vocab_size", "device", "context_length", "d_ff")
+    lm_args = ("num_layers", "d_model", "num_heads", "vocab_size", "device", "context_length", "d_ff", "ablate_rms")
     optim_args = ("lr", "weight_decay", "betas", "eps")
     parser.set_defaults(**configs[args.model])
     args = parser.parse_args()
