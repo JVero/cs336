@@ -78,6 +78,7 @@ parser.add_argument("--rng_seed", type=int, default=0)
 
 parser.add_argument("--ablate_rms", action='store_true')
 parser.add_argument("--use_post_norm", action='store_true')
+parser.add_argument("--no_rope", action="store_true")
 
 def save_config_log(config):
     current_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()

@@ -76,7 +76,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `generate` Generate text (1 pt)
 - [x] `layer_norm_ablation` Remove RMSNorm and train (0.5 B200 hrs) (1 pt)
 - [x] `pre_norm_ablation` Implement post-norm and train (0.5 B200 hrs) (1 pt)
-- [ ] `no_pos_emb` Implement NoPE (0.5 B200 hrs) (1 pt)
+- [x] `no_pos_emb` Implement NoPE (0.5 B200 hrs) (1 pt)
 - [ ] `swiglu_ablation` SwiGLU vs. SiLU (0.5 B200 hrs) (1 pt)
 - [ ] `main_experiment` Experiment on OWT (2 B200 hrs) (2 pts)
 - [ ] `leaderboard` Leaderboard (10 B200 hrs) (6 pts)
