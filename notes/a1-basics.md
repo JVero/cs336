@@ -526,6 +526,58 @@ the figures in ./figures/ BatchSizeSweepFullCurve.png and BatchSizeZoomedCurve.p
 
 Generate text (1 point)
 
+Running each of the models trained today: 
+
+bs8
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/TinyStoriesV2-GPT4-bs8-lr1e-3-0910-213136 --vocab TinyStoriesV2-GPT4-train_vocab.json --merges TinyStoriesV2-GPT4-train_merges.json`
+in a big forest, there lived a bossy rabbit named Max. Max loved to scare the little animals and make them run away. One day, a small squirrel named Sam came to the forest. Sam wanted to find some nuts to eat.
+Sam saw a bird named Bella and said, "I can fly high and look for nuts!" Bella was scared, but she did not want to be bossy. She said, "I don't want to be bossy. Let's find some nuts together!"
+So, Bella and Sam started to search for nuts. They looked under leaves, in rocks, and behind plants. They did not find any nuts. Finally, they found some nuts hidden in a big bush. Bella was happy, and Sam was happy too. They both learned that being bossy was not so bad after all.
+
+bs16
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/TinyStoriesV2-GPT4-bs16-lr1e-3-0910-220108 --vocab TinyStoriesV2-GPT4-train_vocab.json --merges TinyStoriesV2-GPT4-train_merges.json`
+in a big forest, there lived a strong elephant named Elly. Elly had big ears and a long nose. She was very kind and loved to play with her friends.
+One day, Elly saw a small mouse. The mouse was trembling. Elly wanted to help the mouse. She used her big nose to hold the mouse in her tiny paws. The mouse was very happy.
+Elly and the mouse became good friends. They played together every day. The mouse liked Elly's big ears and the pretty dress. And they lived happily ever after.
+
+bs32
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/TinyStoriesV2-GPT4-bs32-lr1e-3-0910-210533 --vocab TinyStoriesV2-GPT4-train_vocab.json --merges TinyStoriesV2-GPT4-train_merges.json`
+in a big sea, there lived a powerful whale. The whale loved to dive deep down into the sea. He had many friends, like fish, crabs, and dolphins.
+One day, the powerful whale saw a big boat. He thought it would be fun to dive into the sea. So, he went inside the boat and started to dive. He swam and splashed and played. The powerful whale was very happy.
+The powerful whale liked to dive into the water. He would dive and dive all around, back and forth, playing with his friends. They all had so much fun. The powerful whale and his friends played until the sun went down. And they all lived happily ever after.
+
+bs64
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/TinyStoriesV2-GPT4-bs64-lr1e-3-0910-210541 --vocab TinyStoriesV2-GPT4-train_vocab.json --merges TinyStoriesV2-GPT4-train_merges.json`
+in a big pond, there lived a grumpy old frog. He was always in the middle of the water. He loved to hop all day long, but the other animals would not allow him to play with him because he was too bossy.
+One day, a little fish came to the pond. He saw the grumpy frog and wanted to play with him. But the frog said, "No, you cannot play with us." The other animals were sad and did not want to play with the grumpy frog.
+So, the little fish thought of a plan. He told the other animals to swim in the water and let the grumpy frog play with them. The grumpy frog did not want to try. He said, "No, I will not play with you." The other animals were sad and thought the grumpy frog was not nice.
+Then, the frog had an idea. He told all the animals to share their toys and play together. The animals agreed, and they all had fun playing with the grumpy frog. They learned that it is better to be kind and play with others, rather than hiding the whole time. And they all lived happily ever after.
+
+bs128
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/TinyStoriesV2-GPT4-bs128-lr1e-3-0910-210613 --vocab TinyStoriesV2-GPT4-train_vocab.json --merges TinyStoriesV2-GPT4-train_merges.json`
+in a big city, there lived a very fast cat named Speed. Speed liked to zoom up and down the street all day. He was very happy.
+One day, while Speed was zooming, he met a new friend, a little mouse named Fleie. They played together and had lots of fun. But they did not know that the street was not safe.
+The next day, Speed tried to zoom too close to the street again. He was too big to zoom around the street. He tried and tried, but he could not go near the street. The cars and the street became too dangerous.
+In the end, Speed was hurt and could not zoom anymore. He felt sad and wished he had listened to his friend. The moral of the story is to always listen to your friends when they try to help you when you can.
+
+bs256
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/TinyStoriesV2-GPT4-bs256-lr1e-3-0910-205026 --vocab TinyStoriesV2-GPT4-train_vocab.json --merges TinyStoriesV2-GPT4-train_merges.json`
+in a big valley, there was a beautiful bird. The bird loved to soar high in the sky. It would sing all day long. The valley was her home.
+One day, a little bird was lost. It could not find its way home. The bird was sad. She wanted to find her way home. She thought and thought. Then, she had a big idea.
+The bird called all her animal friends. They all came to help. They looked for the bird's home. They looked near the trees and the flowers. They could not find the way. The bird was sad and tired. The valley was not a happy place anymore.
+
+Reading these models, all of them seem to have the same thematic arc, and <|endoftext|> is very likely to happen after a conclusion, which is really interesting. These are all with temperature 1.0, but when I increase the temperature to about 1.5 the text becomes completely incoherent
+
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/TinyStoriesV2-GPT4-bs8-lr1e-3-0910-213136 --vocab TinyStoriesV2-GPT4-train_vocab.json --merges TinyStoriesV2-GPT4-train_merges.json --temperature 1.55`
+in a big pond, there lived a regular fish named Fred. He loved to show things to his friends. One sunny day, he set out on a big adventure.
+Fred swam far from the water with a "match." Swimflate tries red. It left pink, blue, and yellow markack gum anywhere. You stepped on circles, missing, not shell!" Fred was excited to show everyone, clapped her fins and bracelets.
+They all cheered and thanked the food fish. They celebrated moving and chewing fire gum. Fred had won a loud hippo that day. All his animal friends waved and bum sank from the water. Fred was a human hero for finding their way at sea.
+
+To counterbalance the temperature, allowing varied input while not going into the long tail, we can combine the temperature with p
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/TinyStoriesV2-GPT4-bs8-lr1e-3-0910-213136 --vocab TinyStoriesV2-GPT4-train_vocab.json --merges TinyStoriesV2-GPT4-train_merges.json --temperature 1.55 --p 0.5`
+ there was a tall man named Bob. Bob loved to read books. One day, he saw a little girl named Lily. Lily liked to read too. They read books together every day. Bob and Lily were happy.
+One day, Lily found a magic word in her book. She said, "Duckishes!" Bob showed her the word and Lily said, "I wish I could read the whole book!" Suddenly, Bob and Lily could read the book without touching the word. They were so happy.
+From that day on, Lily and Bob would read the book every day. They read it together and had lots of fun. The town became a happy place. And everyone loved to read the magic word.
 
 ## layer_norm_ablation
 

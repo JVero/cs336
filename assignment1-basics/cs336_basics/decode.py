@@ -47,20 +47,22 @@ with open(params_fname, "r") as f:
 
 valid_keys = ("d_model", "num_heads", "d_ff", "vocab_size", "context_length", "num_layers", "device")
 params = {k: config[k] for k in valid_keys}
+params["device"] = "mps" if torch.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+
 params["dtype"] = torch.float32
-rope = RotaryPositionalEmbedding(config["theta"], params["d_model"] // params["num_heads"], params["context_length"], device=config["device"])
+rope = RotaryPositionalEmbedding(config["theta"], params["d_model"] // params["num_heads"], params["context_length"], device=params["device"])
 context_length = params["context_length"]
 
 model = TransformerLM(**params, rope=rope)
-state_dict = torch.load(ckpt)
+state_dict = torch.load(ckpt, map_location=params["device"])
 
 model.load_state_dict(state_dict["model"])
 
 model.eval()
 
 torch.manual_seed(0)
-X_cur = X.clone().to(config["device"])
-X_out = torch.tensor([], device=config["device"])
+X_cur = X.clone().to(params["device"])
+X_out = torch.tensor([], device=params["device"])
 
 with torch.no_grad():
     for i in range(args.max_length):
