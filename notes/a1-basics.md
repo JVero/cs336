@@ -619,7 +619,13 @@ The loss curves are shown in `figures/PostNormAblation.png`. Each model has matc
 ## no_pos_emb
 
 Implement NoPE (0.5 B200 hrs) (1 point)
+Local command: 
+`uv run -m cs336_basics.training_loop --train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label rope_ablation --no_rope`
 
+modal command
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label rope_ablation --no_rope"`
+
+Comparing the curves in figures/RopeAblation.png, RoPE is always superior to NoPE, loss-wise. This is not statistically established in the data I collected, because that would require multiple paired samples like this (identical seeds and matched configs otherwise), and would only be a valid conclusion under the tested configs. The difference between runs (visualized at figures/DifferenceInValidationLoss.png) shows that (after step 80) the loss of RoPE was always lower than NoPE, but the difference narrowed over time.
 
 ## swiglu_ablation
 
