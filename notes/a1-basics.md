@@ -630,6 +630,11 @@ Comparing the curves in figures/RopeAblation.png, RoPE is always superior to NoP
 ## swiglu_ablation
 
 SwiGLU vs. SiLU (0.5 B200 hrs) (1 point)
+Local command:
+`uv run -m cs336_basics.training_loop --train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label silu_ablation --use_silu --d_ff 2048`
+
+Modal command:
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label silu_ablation --use_silu --d_ff 2048"`
 
 
 ## main_experiment
