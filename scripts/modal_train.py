@@ -79,7 +79,7 @@ image = (
 
 @app.function(
     image=image,
-    gpu="B300",
+    gpu="B200",
     volumes={DATA_MOUNT: data_vol, RUNS_MOUNT: runs_vol},
     timeout=24 * 3600,
 )
@@ -113,6 +113,6 @@ def train(flags: list[str]) -> None:
 
 
 @app.local_entrypoint()
-def main(flags: str, gpu: str = "B300", timeout_hours: float = 12.0) -> None:
+def main(flags: str, gpu: str = "B200", timeout_hours: float = 12.0) -> None:
     fn = train.with_options(gpu=gpu, timeout=int(timeout_hours * 3600))
     fn.remote(shlex.split(flags))
