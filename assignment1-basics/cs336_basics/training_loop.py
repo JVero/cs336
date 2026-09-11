@@ -76,9 +76,11 @@ parser.add_argument("--val_num_batches", type=int, default=10)
 
 parser.add_argument("--rng_seed", type=int, default=0)
 
+# Ablations
 parser.add_argument("--ablate_rms", action='store_true')
 parser.add_argument("--use_post_norm", action='store_true')
 parser.add_argument("--no_rope", action="store_true")
+parser.add_argument("--use_silu", action="store_true")
 
 def save_config_log(config):
     current_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
@@ -110,17 +112,19 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     
-    lm_args = ("num_layers", "d_model", "num_heads", "vocab_size", "device", "context_length", "d_ff", "ablate_rms", "use_post_norm")
+    lm_args = ("num_layers", "d_model", "num_heads", "vocab_size", "device", "context_length", "d_ff", "ablate_rms", "use_post_norm", "use_silu")
     optim_args = ("lr", "weight_decay", "betas", "eps")
     parser.set_defaults(**configs[args.model])
     args = parser.parse_args()
     lm_vals = {k: getattr(args, k) for k in lm_args}
     
-    rope = RotaryPositionalEmbedding(args.theta, args.d_model // args.num_heads, args.context_length, args.device)
+    rope = None if args.no_rope else RotaryPositionalEmbedding(args.theta, args.d_model // args.num_heads, args.context_length, args.device)
     lm_vals['rope'] = rope
     optim_vals = {k: getattr(args, k) for k in optim_args}
-
-    lm_vals["d_ff"] = lm_vals.get("d_ff") or 64 * round((8 * lm_vals["d_model"] // 3) / 64)    
+    if lm_vals.get("use_silu", False):
+        lm_vals["d_ff"] = lm_vals.get("d_ff") or 4 * lm_vals["d_model"]
+    else:
+        lm_vals["d_ff"] = lm_vals.get("d_ff") or 64 * round((8 * lm_vals["d_model"] // 3) / 64)    
     args.d_ff = lm_vals["d_ff"]
     
     run_dir = save_config_log(vars(args))
