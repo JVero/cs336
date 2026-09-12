@@ -31,6 +31,8 @@ plt.legend()
 plt.show()
 fig.savefig("./figures/SiLUAblation.png")
 fig = plt.gcf()
+fig.set_size_inches(10, 5, forward=True)
+
 for i, (steps, val) in enumerate(losses):
     plt.semilogy(steps, val, label=labels[i])
 plt.ylim(1.2, 1.5)

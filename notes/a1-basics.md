@@ -695,7 +695,7 @@ Looking at these differences as well as the np.diff between these curves, there 
 
 Experiment on OWT (2 B200 hrs) (2 points)
 OWT has a total number of tokens 2_727_120_452, compared to 
-                                   540_796_778 in tinystories
+                                   540_796_778 in tinystories, and each dataset has a different tokenizer due to underlying entropy of the corpus's bytes, which is partly a function of dataset size and also due to it being naturalistic and not artificially generated.
 
 `uv run -m cs336_basics.training_loop --train_data owt_train.npy --val_data owt_valid.npy --num_steps 40000 --vocab_size 32000 --lr 1e-3 --batch_size 32 --label owt_first_run`
 
@@ -704,6 +704,28 @@ OWT has a total number of tokens 2_727_120_452, compared to
 To get the volume
 
 `modal volume get cs336-runs owt_train-owt_first_modal_run-lr1e-3-0911-220201 ./runs`
+
+OWTVsTS.png is the plot showing the loss curve of OWT vs TinyStories on a matched architecture. These plots aren't apples to apples comparable because they have different tokenizers and because each dataset has a different underlying irreducible entropy, as demonstrated in the generated text. The text generated from tinystories had a coherent thread for the small motif of stories it had, but OWT has a more broad range of things it talks about, so it requires a model that is able to store that complexity (whether that means more training steps or a different architecture/hyperparameter choices) that is able to keep the thread coherent.
+
+Generating text:
+
+`uv run -m cs336_basics.decode --input "Once upon a time," --run_directory runs/owt_train-owt_first_modal_run-lr1e-3-0911-220201 --vocab owt_train_vocab.json --merges owt_train_merges.json`
+Sample output
+```
+I finally posted what it was. I saved a photo. There were a lot of hacks in my tech base: there was an emaciated note floating on my car, a lock-case, an unwritten “patentotor.com website, beautiful tin(self) stands empty." She spent much of her life completing the gameplay training thing when I was at my school.
+
+“At last count I had joined over in the security room, I had helped me get the base credit card in peace and I was really able to sleep in peace and I had help from other than the typical hacker teams behind me. I had been doing background checks on my body, especially after I was making rounds at the airport, and I loved the show!”
+
+Friends found the photos perfectly smooth to life in the eye and even an occasional picture of a black jet. The flashy wildcat lurched on the back of the screen was showing in colorful, but did not advance to the center of the mystery of the story.
+
+“How did you know these are out of place?
+
+“I know they were packed with interesting conversation-sessions out of place. These are really different things.”
+
+When I visited the scene, many fans seem to have felt, I still could think of myself a small football player. No such idiots, that’s what made me better because of a play, there’s something about the experience of the fans trying
+```
+
+The text isn't as globally coherent because the long-range dependencies of this dataset aren't as predictible. Also arguably the prompt isn't as appropriate for this dataset as "once upon a time" verifiably does not exist in the OWT dataset at all, and appears 3800+ times in tinystories.
 
 ## leaderboard
 
