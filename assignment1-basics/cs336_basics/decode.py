@@ -43,7 +43,7 @@ if not ckpt.is_file():
 with open(params_fname) as f:
     config = json.load(f)
 
-valid_keys = ("d_model", "num_heads", "d_ff", "vocab_size", "context_length", "num_layers", "device", "ablate_rms", "use_post_norm", "no_rope", "use_silu")
+valid_keys = ("d_model", "num_heads", "d_ff", "vocab_size", "context_length", "num_layers", "device", "ablate_rms", "use_post_norm", "use_silu")
 params = {k: config[k] for k in valid_keys}
 params["device"] = "mps" if torch.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
 

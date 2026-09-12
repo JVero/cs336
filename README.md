@@ -78,8 +78,8 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `pre_norm_ablation` Implement post-norm and train (0.5 B200 hrs) (1 pt)
 - [x] `no_pos_emb` Implement NoPE (0.5 B200 hrs) (1 pt)
 - [x] `swiglu_ablation` SwiGLU vs. SiLU (0.5 B200 hrs) (1 pt)
-- [ ] `main_experiment` Experiment on OWT (2 B200 hrs) (2 pts)
-- [ ] `leaderboard` Leaderboard (10 B200 hrs) (6 pts)
+- [x] `main_experiment` Experiment on OWT (2 B200 hrs) (2 pts)
+- [ ] `leaderboard` Leaderboard (10 B200 hrs) (6 pts) — deferred to after A2: run the A1 model and the A2-optimized one side by side on the same 45-min budget
 
 ### Assignment 2: Systems
 
