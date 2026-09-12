@@ -1,15 +1,13 @@
-from typing import Iterable, Iterator
+from collections.abc import Iterable, Iterator
 
 import json
 import regex as re
 from itertools import pairwise
-from .pretokenization_example import find_chunk_boundaries
 
-from .train_bpe import build_occurrences
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
-class Tokenizer():
+class Tokenizer:
     def __init__(self, 
                  vocab: dict[int, bytes], 
                  merges: list[tuple[bytes, bytes]], 
@@ -27,10 +25,10 @@ class Tokenizer():
         
         # Identifies each merge
         self.merge_ids = {}
-        for i, (l, r) in enumerate(self.merges):
-            merge_key = (self.i_vocab[l], self.i_vocab[r])
+        for i, (left, right) in enumerate(self.merges):
+            merge_key = (self.i_vocab[left], self.i_vocab[right])
             self.merge_ranks[merge_key] = i
-            self.merge_ids[(self.i_vocab[l], self.i_vocab[r])] = self.i_vocab[l + r]
+            self.merge_ids[(self.i_vocab[left], self.i_vocab[right])] = self.i_vocab[left + right]
             
         self.special_tokens = special_tokens and sorted(special_tokens, key=lambda t: len(t), reverse=True)
 
@@ -46,12 +44,12 @@ class Tokenizer():
         """
         a file is a big json file dictionary
         """
-        with open(vocab_filepath, 'r') as f:
+        with open(vocab_filepath) as f:
             vocab_s: dict[int, str] = json.load(f)
         vocab = {int(k): bytes.fromhex(v) for k, v in vocab_s.items()}
         with open(merges_filepath) as f:
             merge_strs: list[tuple[str, str]] = json.load(f)
-        merges: list[tuple[bytes, bytes]] = [(bytes.fromhex(l), bytes.fromhex(r)) for l, r in merge_strs]
+        merges: list[tuple[bytes, bytes]] = [(bytes.fromhex(left), bytes.fromhex(right)) for left, right in merge_strs]
         return cls(vocab, merges, special_tokens=special_tokens)
         
     def encode(self, text: str) -> list[int]:

@@ -1,6 +1,5 @@
 import torch
 from collections.abc import Callable, Iterable
-from typing import Optional, Tuple, TypeAlias, IO
 import typing
 import math
 import os
@@ -26,7 +25,7 @@ class SGD(torch.optim.Optimizer):
         defaults = {"lr": lr}
         super().__init__(params, defaults)
         
-    def step(self, closure: Optional[Callable] = None): # type: ignore
+    def step(self, closure: Callable | None = None): # type: ignore
         loss = None if closure is None else closure()
         for group in self.param_groups:
             lr = group["lr"] # Get the learning rate.
@@ -55,7 +54,7 @@ class AdamW(torch.optim.Optimizer):
                     "eps": eps}
         super().__init__(params, defaults)
             
-    def step(self, closure: Optional[Callable] = None): # type: ignore
+    def step(self, closure: Callable | None = None): # type: ignore
         loss = None if closure is None else closure()
         for group in self.param_groups:
             gamma, lr, b1, b2, eps = (group[k] for k in ["gamma", "lr", "b1", "b2", "eps"])
@@ -126,7 +125,7 @@ def gradient_clipping(parameters: Iterable[torch.nn.Parameter], M: float, eps=1e
         if param.grad is not None:
             param.grad *=  frac
 
-def get_batch(arr, batch_size, context_length: int, device=None) -> Tuple[torch.Tensor, torch.Tensor]:
+def get_batch(arr, batch_size, context_length: int, device=None) -> tuple[torch.Tensor, torch.Tensor]:
     idx = torch.randint(0, len(arr) - context_length, [batch_size], dtype=torch.long)
     offsets = torch.arange(context_length, dtype=torch.long)
     ix = idx[:, None] + offsets[None, :]
@@ -144,7 +143,7 @@ def save_checkpoint(model: torch.nn.Module,
         out_tmp = Path(out).with_name(Path(out).name + ".tmp")
         try:
             torch.save(d, out_tmp)
-        except Exception as E:
+        except Exception:
             out_tmp.unlink(missing_ok = True)
             raise
         os.replace(out_tmp, out)

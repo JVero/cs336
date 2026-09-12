@@ -9,7 +9,14 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
-from cs336_basics.transformer import Linear
+from cs336_basics.transformer import Linear, Embedding, SwiGLU, scaled_dot_product_attention, RotaryPositionalEmbedding, Transformer, TransformerLM
+from cs336_basics.transformer import RMSNorm, softmax
+from cs336_basics.transformer import FusedMultiheadSelfAttention as MSA
+from cs336_basics.tokenizer import Tokenizer
+
+from cs336_basics.training import AdamW, get_batch, cross_entropy, gradient_clipping, learning_rate_scheduler, save_checkpoint, load_checkpoint
+
+from cs336_basics.train_bpe import train_bpe
 
 def run_linear(
     d_in: int,
@@ -33,7 +40,6 @@ def run_linear(
     model.load_state_dict({"W": weights})
     return model(in_features)
 
-from cs336_basics.transformer import Embedding
 def run_embedding(
     vocab_size: int,
     d_model: int,
@@ -55,8 +61,6 @@ def run_embedding(
     model = Embedding(vocab_size, d_model)
     model.load_state_dict({"W": weights})
     return model(token_ids)
-
-from cs336_basics.transformer import SwiGLU
 
 def run_swiglu(
     d_model: int,
@@ -100,7 +104,6 @@ def run_swiglu(
     })
     return swiglu(in_features)
     
-from cs336_basics.transformer import scaled_dot_product_attention
 
 def run_scaled_dot_product_attention(
     Q: Float[Tensor, " ... queries d_k"],
@@ -122,7 +125,6 @@ def run_scaled_dot_product_attention(
     """
     return scaled_dot_product_attention(Q, K, V, mask=mask)
 
-from cs336_basics.transformer import FusedMultiheadSelfAttention as MSA
 
 def run_multihead_self_attention(
     d_model: int,
@@ -168,8 +170,6 @@ def run_multihead_self_attention(
 
     return msa(in_features)
     
-from cs336_basics.transformer import RotaryPositionalEmbedding
-
 def run_multihead_self_attention_with_rope(
     d_model: int,
     num_heads: int,
@@ -242,8 +242,6 @@ def run_rope(
     """
     rope = RotaryPositionalEmbedding(theta, d_k, max_seq_len)
     return rope(in_query_or_key, token_positions)
-
-from cs336_basics.transformer import Transformer
 
 def run_transformer_block(
     d_model: int,
@@ -339,8 +337,6 @@ def run_transformer_block(
     })
     
     return trans(in_features)
-
-from cs336_basics.transformer import TransformerLM
 
 def run_transformer_lm(
     vocab_size: int,
@@ -439,13 +435,12 @@ def run_transformer_lm(
             "rms2.g": weights[f"layers.{i}.ln2.weight"],
         })
     TLM.norm.load_state_dict({
-        "g": weights[f"ln_final.weight"]
+        "g": weights["ln_final.weight"]
     })
     TLM.linear.load_state_dict({
-        "W": weights[f"lm_head.weight"]
+        "W": weights["lm_head.weight"]
     })
     return TLM(in_indices)
-from cs336_basics.transformer import RMSNorm
 
 def run_rmsnorm(
     d_model: int,
@@ -485,7 +480,6 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
     """
     return SwiGLU.silu(in_features)
 
-from cs336_basics.training import get_batch
 
 def run_get_batch(
     dataset: npt.NDArray, batch_size: int, context_length: int, device: str
@@ -509,7 +503,6 @@ def run_get_batch(
     """
     return get_batch(dataset, batch_size, context_length, device)
 
-from cs336_basics.transformer import softmax
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
     """
@@ -526,7 +519,6 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
     """
     return softmax(in_features, dim)
 
-from cs336_basics.training import cross_entropy
 
 def run_cross_entropy(
     inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]
@@ -545,7 +537,6 @@ def run_cross_entropy(
     """
     return cross_entropy(inputs, targets)
 
-from cs336_basics.training import gradient_clipping
 
 def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
     """Given a set of parameters, clip their combined gradients to have l2 norm at most max_l2_norm.
@@ -558,7 +549,6 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
     """
     return gradient_clipping(parameters, max_l2_norm)
 
-from cs336_basics.training import AdamW
 
 def get_adamw_cls() -> Any:
     """
@@ -566,7 +556,6 @@ def get_adamw_cls() -> Any:
     """
     return AdamW
     
-from cs336_basics.training import learning_rate_scheduler
 
 def run_get_lr_cosine_schedule(
     it: int,
@@ -595,7 +584,6 @@ def run_get_lr_cosine_schedule(
     """
     return learning_rate_scheduler(it, max_learning_rate, min_learning_rate, warmup_iters, cosine_cycle_iters)
 
-from cs336_basics.training import save_checkpoint, load_checkpoint
 
 def run_save_checkpoint(
     model: torch.nn.Module,
@@ -636,9 +624,6 @@ def run_load_checkpoint(
     """
     return load_checkpoint(src, model, optimizer)
 
-from cs336_basics.tokenizer import Tokenizer
-
-
 def get_tokenizer(
     vocab: dict[int, bytes],
     merges: list[tuple[bytes, bytes]],
@@ -661,7 +646,6 @@ def get_tokenizer(
     """
     return Tokenizer(vocab, merges, special_tokens=special_tokens)
 
-from cs336_basics.train_bpe import train_bpe
 
 def run_train_bpe(
     input_path: str | os.PathLike,
