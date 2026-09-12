@@ -40,7 +40,6 @@ def build_occurrences(fp, start, stop, special_tokens):
                 # Turn the chunk into a tuple of token IDs
                 byte_chunk = tuple(chunk[0].encode('utf-8'))
                 occurrences[byte_chunk] += 1
-        print("\r", start, end="", flush=True)
         return occurrences
 
 def train_bpe(input_path: str | Path,
@@ -129,7 +128,6 @@ def train_dataset(data_filename, *,data_dir: Path =  Path(__file__).parent.paren
 
     input_path: Path = data_dir / data_filename
     if not input_path.is_file():
-        print([data_dir.glob("*")])
         raise ValueError(f"{input_path} is not in the directory")
     
     vocab, mergelist = train_bpe(input_path, vocab_size, special_tokens=special_tokens, num_chunks=num_chunks, num_workers=num_workers)

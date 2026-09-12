@@ -658,7 +658,7 @@ Experiment on OWT (2 B200 hrs) (2 points)
 OWT has a total number of tokens 2_727_120_452, compared to 
                                    540_796_778
 
-`uv run -m cs336_basics.training_loop --train_data owt_train.npy --val_data owt_train.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label owt_first_run`
+`uv run -m cs336_basics.training_loop --train_data owt_train.npy --val_data owt_valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label owt_first_run`
 
 `modal run scripts/modal_train.py --flags "--train_data owt_train.npy --val_data owt_valid.npy --num_steps 40000 --vocab_size 32000 --lr 1e-3 --batch_size 32 --label owt_first_modal_run"`
 
