@@ -13,7 +13,6 @@ losses: list[tuple[pd.Series, pd.Series]] = []
 for run in runs:
     with open(run / "config.json") as f:
         config = json.load(f)
-    print(config["num_steps"])
     metric_file = run / "metrics.csv"
     df = pd.read_csv(metric_file)
     val = df["validation_loss"]
@@ -24,6 +23,7 @@ for run in runs:
 fig = plt.gcf()    
 fig.set_size_inches(20, 10, forward=True)
 
+### Statistics
 print(losses[0][1].corr(losses[1][1]))
 series1 = losses[0][1] # rope
 series2 = losses[1][1] # nope

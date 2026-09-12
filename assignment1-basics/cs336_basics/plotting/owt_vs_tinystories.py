@@ -13,7 +13,7 @@ losses: list[tuple[pd.Series, pd.Series]] = []
 for run in runs:
     with open(run / "config.json") as f:
         config = json.load(f)
-    print(config["num_steps"])
+    print(config["num_steps"]) # Keeping this
     metric_file = run / "metrics.csv"
     df = pd.read_csv(metric_file)
     val = df["validation_loss"]
