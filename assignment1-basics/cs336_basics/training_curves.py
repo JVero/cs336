@@ -12,7 +12,6 @@ print("Loss | Steps | Train loss | Valid loss")
 for run in runs:
     with open(run / "config.json") as f:
         config = json.load(f)
-    print(config["num_steps"])
     ablated = config.get("ablate_rms", False)
     lr = config["lr"]
     metric_file = run / "metrics.csv"
@@ -32,7 +31,6 @@ for run, (steps, tr, val, lr, ablated, postnorm) in sorted(losses.items(), key=l
         label = str(lr) + " (rms ablated)"
     if postnorm:
         label = str(label) + " (postnorm)"
-    print(label)
     plt.semilogy(steps, val, label=label)
 plt.title("Pre/Post norm ablation (validation)")
 plt.ylabel("Log Cross-Entropy Loss")
