@@ -37,7 +37,7 @@ parser.add_argument("--num_layers", help="Number of transformer layers", type=in
 parser.add_argument("--d_model", help="Dimensionality of the model", type=int)
 parser.add_argument("--num_heads", type=int)
 
-parser.add_argument("--vocab_size", type=int, default= 50_257)
+parser.add_argument("--vocab_size", type=int)
 parser.add_argument("--d_ff", type=int)
 parser.add_argument("--context_length", type=int, default=256)
 
@@ -88,12 +88,12 @@ def save_config_log(config):
     current_patch = subprocess.check_output(['git', 'diff', 'HEAD'])
     curr_time = datetime.now()
     mmdd = curr_time.strftime("%m%d-%H%M%S")
-    l = args.label or ""
-    if l != "":
-        l = f"-{l}"
+    user_label = args.label or ""
+    if user_label != "":
+        user_label = f"-{user_label}"
     lr_label = np.format_float_scientific(args.lr, precision=0, exp_digits=1, trim='-')
     label_prefix = pathlib.Path(args.train_data).with_suffix("")
-    label = f"{label_prefix}{l}-lr{lr_label}-{mmdd}".replace("-train","")
+    label = f"{label_prefix}{user_label}-lr{lr_label}-{mmdd}".replace("-train","")
     run_dir: pathlib.Path = pathlib.Path(config['runs_dir']) / label
     run_dir.mkdir(parents=True)
     with open(run_dir / "diff.patch", "wb") as f:
@@ -108,14 +108,16 @@ def save_config_log(config):
     return run_dir
     
 if __name__ == "__main__":
-    # the rest of my script
     args = parser.parse_args()
 
-    
     lm_args = ("num_layers", "d_model", "num_heads", "vocab_size", "device", "context_length", "d_ff", "ablate_rms", "use_post_norm", "use_silu")
     optim_args = ("lr", "weight_decay", "betas", "eps")
     parser.set_defaults(**configs[args.model])
     args = parser.parse_args()
+    
+    if args.vocab_size is None:
+        raise ValueError("--vocab_size must be either implicitly flagged using a --model with vocab_size defined or explicitly using --vocab_size, matching the dataset")
+    
     lm_vals = {k: getattr(args, k) for k in lm_args}
     
     rope = None if args.no_rope else RotaryPositionalEmbedding(args.theta, args.d_model // args.num_heads, args.context_length, args.device)

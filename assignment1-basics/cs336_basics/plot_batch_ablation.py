@@ -15,7 +15,7 @@ print(batch_dirs)
 
 for d in batch_dirs:
     print(d)
-    with open(d / "config.json", "r") as f:
+    with open(d / "config.json") as f:
         config = json.load(f)
     batch_size: int = int(config["batch_size"])
     val_num_batches = config["val_num_batches"]
@@ -29,12 +29,12 @@ for d in batch_dirs:
 print(ls)
 fig = plt.gcf()    
 fig.set_size_inches(20, 10, forward=True)
-for l in sorted(ls):
+for l_idx in sorted(ls):
     # if l == 8:
 
-    window_size = 2560 // (l * ls[l][2])
-    y = ls[l][1].rolling(window_size, center=True).mean()
-    plt.semilogy(ls[l][0]/1e6, y, label=str(l) + F" (averaged with window_size={window_size})")
+    window_size = 2560 // (l_idx * ls[l_idx][2])
+    y = ls[l_idx][1].rolling(window_size, center=True).mean()
+    plt.semilogy(ls[l_idx][0]/1e6, y, label=str(l_idx) + F" (averaged with window_size={window_size})")
 plt.ylabel("Log validation loss (cross-entropy)")
 plt.xlabel("Tokens trained on (in millions)")
 plt.title("Batch-sizes < 64 are indistinguishable at the end in terms of validation loss")

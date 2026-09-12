@@ -1,5 +1,3 @@
-from typing import Iterable
-import regex as re
 from .tokenizer import Tokenizer
 
 from pathlib import Path
@@ -56,8 +54,7 @@ def sample_docs(*, dataset, tokenizer):
     n_bytes = 0
     n_toks = 0
     max_docs = 10
-    all_toks = []
-    with open(fpath, 'r') as f:
+    with open(fpath) as f:
         while n_docs < max_docs:
             newline = f.readline()
             n_bytes += len(newline.encode("utf-8"))
@@ -76,12 +73,7 @@ def convert_docs(*, dataset, tokenizer,  chunk_size=100_000_000, n_worker=12):
         offsets = find_chunk_boundaries(f, n_chunk, bytes("<|endoftext|>", encoding="utf-8"))
     
     with Pool(n_worker, initializer=build_tokenizer, initargs=(v_path, m_path)) as p:
-        chunks = p.starmap(process_chunk, [(fpath, start, stop) for start, stop in pairwise(offsets)])
-    
-    opath = fpath.with_suffix(".npy")
-    
-    out_chunks = np.concatenate(chunks, dtype=np.uint16)
-    # np.save(opath, out_chunks)
+        _ = p.starmap(process_chunk, [(fpath, start, stop) for start, stop in pairwise(offsets)])
 
 if __name__ == "__main__":
     # Part A

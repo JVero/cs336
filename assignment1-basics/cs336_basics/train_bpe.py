@@ -2,7 +2,6 @@ import regex as re
 
 from collections import Counter, defaultdict
 from itertools import pairwise
-from functools import reduce
 
 
 from pathlib import Path
@@ -11,7 +10,7 @@ from .pretokenization_example import find_chunk_boundaries
 
 from multiprocessing import Pool
 
-from tqdm import trange, tqdm
+from tqdm import trange
 
 # To profile this
 # sudo uv run py-spy record --subprocesses -o profile_graph.svg \
@@ -125,7 +124,6 @@ def train_bpe(input_path: str | Path,
     return id_to_bytes, merges
     
 def train_dataset(data_filename, *,data_dir: Path =  Path(__file__).parent.parent / "data", vocab_size=10_000, special_tokens=["<|endoftext|>"], num_chunks=120, num_workers=12):
-    from glob import glob
     if not data_dir.is_dir():
         raise ValueError(f"{str(data_dir)} is not a directory.")
 
@@ -136,7 +134,7 @@ def train_dataset(data_filename, *,data_dir: Path =  Path(__file__).parent.paren
     
     vocab, mergelist = train_bpe(input_path, vocab_size, special_tokens=special_tokens, num_chunks=num_chunks, num_workers=num_workers)
     readable_vocab = {k : v.hex() for k,v in vocab.items()}
-    readable_merges = [(l.hex(), r.hex()) for l, r in mergelist]
+    readable_merges = [(left.hex(), right.hex()) for left, right in mergelist]
     import json
     with open(input_path.stem + "_vocab.json", "w+") as f:
         json.dump(readable_vocab, f)

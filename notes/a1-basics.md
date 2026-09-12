@@ -634,13 +634,37 @@ Local command:
 `uv run -m cs336_basics.training_loop --train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label silu_ablation --use_silu --d_ff 2048`
 
 Modal command:
-`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label silu_ablation --use_silu --d_ff 2048"`
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label silu_ablation --use_silu"`
+
+Pull Modal Volume:
+`modal volume get cs336-runs TinyStoriesV2-GPT4-silu_ablation-lr1e-3-0911-182520 ./runs`
+figures/SiLUAblation.png and figures/SiLUAblationZoomed.png both show that the value has a very minor, but consistent change in performance. The difference between them does not change as the training progresses (past step 100, before which is a much more volatile system), compared to the inherent noisiness of either training run, for this batch size and validation batch size. This finding is consistent with the training_loss as well. Any difference between them is overshadowed by the difference within them for any significant window of data.
+
+Final difference: SiLU (d_ff=1344) 1.353, SwiGLU: 1.3216
+
+! d_ff wasn't correct in the above run, rerunning at 2048:
+`modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label silu_ablation_2048 --use_silu --d_ff 2048"`
+
+`modal volume get cs336-runs TinyStoriesV2-GPT4-silu_ablation_2048-lr1e-3-0911-191504 ./runs`
+
+Final values: SiLU (d_ff=2048): 1.3253 SwiGLU: 1.3216
+For the paragraph below, SiLU w/ d_ff 2048 is losses[2], and SwiGLU is losses[0]
+Looking at these differences as well as the np.diff between these curves, there is not a meaningful difference between the two. Looking at np.diff(losses[2][1] - losses[0][1]).mean(), it is approximately -4e-7, which is not significant. in terms of final loss, (losses[2][1][-10:] - losses[0][1][-10:]).mean() is approximately 6e-3, which is also not a meaningful difference. My conclusion here is that the difference observed in the comparison between SiLU_1344 and SwiGLU is due to the difference in parameters.
 
 
 ## main_experiment
 
 Experiment on OWT (2 B200 hrs) (2 points)
+OWT has a total number of tokens 2_727_120_452, compared to 
+                                   540_796_778
 
+`uv run -m cs336_basics.training_loop --train_data owt_train.npy --val_data owt_train.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label owt_first_run`
+
+`modal run scripts/modal_train.py --flags "--train_data owt_train.npy --val_data owt_valid.npy --num_steps 40000 --vocab_size 32000 --lr 1e-3 --batch_size 32 --label owt_first_modal_run"`
+
+To get the volume
+
+`modal volume get cs336-runs owt_train-owt_first_modal_run-lr1e-3-0911-220201 ./runs`
 
 ## leaderboard
 

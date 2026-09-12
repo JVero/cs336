@@ -3,7 +3,6 @@ from matplotlib import pyplot as plt
 import pathlib
 import json
 import pandas as pd
-import numpy as np
 
 run_dir = pathlib.Path("./runs")
 runs = [run_dir / run for run in ["TinyStoriesV2-GPT4-bs32-lr1e-3-0910-210533", "TinyStoriesV2-GPT4-post_norm-lr1e-3-0911-030105"]]
@@ -11,7 +10,7 @@ runs = [run_dir / run for run in ["TinyStoriesV2-GPT4-bs32-lr1e-3-0910-210533", 
 losses = {}
 print("Loss | Steps | Train loss | Valid loss")
 for run in runs:
-    with open(run / "config.json", "r") as f:
+    with open(run / "config.json") as f:
         config = json.load(f)
     print(config["num_steps"])
     ablated = config.get("ablate_rms", False)

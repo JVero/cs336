@@ -2,11 +2,9 @@ from pathlib import Path
 import torch
 import json
 from cs336_basics.transformer import TransformerLM, RotaryPositionalEmbedding, softmax
-from cs336_basics.training import cross_entropy, get_batch
 from cs336_basics.tokenizer import Tokenizer
 
 import argparse
-import numpy as np
 
 # run_dir = Path("./runs/tinystories-0909-191751")
 runs = [str(d) for d in list(Path("./runs").glob("*/"))]
@@ -42,7 +40,7 @@ if not ckpt.parent.is_dir():
 if not ckpt.is_file():
     raise ValueError("File doesn't exist?")
 
-with open(params_fname, "r") as f:
+with open(params_fname) as f:
     config = json.load(f)
 
 valid_keys = ("d_model", "num_heads", "d_ff", "vocab_size", "context_length", "num_layers", "device", "ablate_rms", "use_post_norm", "no_rope", "use_silu")

@@ -11,7 +11,7 @@ runs = [run_dir / run for run in ["TinyStoriesV2-GPT4-bs32-lr1e-3-0910-210533", 
 labels = ("RoPE", "NoPE")
 losses: list[tuple[pd.Series, pd.Series]] = []
 for run in runs:
-    with open(run / "config.json", "r") as f:
+    with open(run / "config.json") as f:
         config = json.load(f)
     print(config["num_steps"])
     metric_file = run / "metrics.csv"
