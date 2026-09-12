@@ -474,10 +474,10 @@ The learning rate has 3 "phases" to speak of. Way too high and you go over the c
 
 To find the optimal LR, we did a log-scale sweep between 3e-4 and 1e0. HOnestly when looking at the loss curves, with a fixed step budget in the neighborhood of 5000 steps, the optimium seems to be between 0.0003 and 0.001, and to find the exact optimum we would search within that. The divergence is about 2-3 oom (100x - 1000x) higher than the best value we sampled here (lr=0.001)
 
-The sweep is evaluated in lr_sweep.sh
+The sweep is evaluated is lr_test.sh
 
-#!/bin/bash
 ```bash
+#!/bin/bash
 vals=(
     3e-4
     1e-3
@@ -666,10 +666,19 @@ Modal command:
 
 Pull Modal Volume:
 `modal volume get cs336-runs TinyStoriesV2-GPT4-silu_ablation-lr1e-3-0911-182520 ./runs`
-figures/SiLUAblation.png and figures/SiLUAblationZoomed.png both show that validation loss has a very minor, but consistent change in performance. The difference between them narrows in the first 20,000 steps, but then never gets meaningfully closer, compared to the inherent noisiness of either training run, for this batch size and validation batch size. This finding is consistent with the training_loss as well. Any difference between them is overshadowed by the difference within them for any significant window of data.
+figures/SiLUAblation.png and figures/SiLUAblationZoomed.png show comparisons with SiLU with both d_ff 1344 and d_ff 2048. The gap between SiLU_1344 and SwiGLU is ~5x larger than the difference between SiLU_2048 and SwiGLU. This demonstrates that it is likely that the difference between SiLU and SwiGLU is purely a parameter issue. Parameter-matched there is not a meaningful difference between the two. SwiGLU has a lower validation mean for the majority of the samples I took, but the difference is not huge.
 
-Final value difference (not average of last 10 runs): SiLU (d_ff=1344) 1.353, SwiGLU: 1.3216. difference of 0.032
-Average of last 10 runs: SiLU: 1.335 SwiGLU: 1.328, difference of 0.07
+┌────────────────┬──────────────┬──────────┬─────────────────────────┐
+│      run       │ last-10 mean │ last row │ gap vs SwiGLU (last-10) │
+├────────────────┼──────────────┼──────────┼─────────────────────────┤
+│ SwiGLU         │ 1.328        │ 1.322    │                         │
+├────────────────┼──────────────┼──────────┼─────────────────────────┤
+│ SiLU d_ff 1344 │ 1.362        │ 1.353    │ 0.033                   │
+├────────────────┼──────────────┼──────────┼─────────────────────────┤
+│ SiLU d_ff 2048 │ 1.335        │ 1.325    │ 0.0066                  │
+└────────────────┴──────────────┴──────────┴─────────────────────────┘
+Final value difference (not average of last 10 runs): SiLU (d_ff=1344) 1.353, SiLU (d_ff=2048) 1.3253, SwiGLU: 1.3216. difference of 0.032 between SiLU 1344 and SwiGLU
+Average of last 10 runs: SiLU (d_ff 2048): 1.335 SwiGLU: 1.328, difference of 0.007
 
 In both comparisons, SwiGLU has a lower validation run 
 ! d_ff wasn't correct in the above run, rerunning at 2048:
@@ -679,16 +688,16 @@ In both comparisons, SwiGLU has a lower validation run
 
 Final values: SiLU (d_ff=2048): 1.3253 SwiGLU: 1.3216
 For the paragraph below, SiLU w/ d_ff 2048 is losses[2], and SwiGLU is losses[0]
-Looking at these differences as well as the np.diff between these curves, there is not a meaningful difference between the two. In terms of final loss, (losses[2][1][-10:] - losses[0][1][-10:]).mean() is approximately 6e-3, which is also not a meaningful difference. My conclusion here is that the difference observed in the comparison between SiLU_1344 and SwiGLU is due to the difference in parameters.
+Looking at these differences as well as the np.diff between these curves, there is not a meaningful difference between the two. In terms of final loss, (losses[2][1][-10:] - losses[0][1][-10:]).mean() is approximately 6e-3, which is *ALSO* not a meaningful difference. My conclusion here is that the difference observed in the comparison between SiLU_1344 and SwiGLU is due to the difference in parameters. The parameters are matched (SwiGLU) 22.70M vs (SiLU d_ff 2048) 22.83M
 
 
 ## main_experiment
 
 Experiment on OWT (2 B200 hrs) (2 points)
 OWT has a total number of tokens 2_727_120_452, compared to 
-                                   540_796_778
+                                   540_796_778 in tinystories
 
-`uv run -m cs336_basics.training_loop --train_data owt_train.npy --val_data owt_valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label owt_first_run`
+`uv run -m cs336_basics.training_loop --train_data owt_train.npy --val_data owt_valid.npy --num_steps 40000 --vocab_size 32000 --lr 1e-3 --batch_size 32 --label owt_first_run`
 
 `modal run scripts/modal_train.py --flags "--train_data owt_train.npy --val_data owt_valid.npy --num_steps 40000 --vocab_size 32000 --lr 1e-3 --batch_size 32 --label owt_first_modal_run"`
 

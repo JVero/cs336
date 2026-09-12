@@ -11,8 +11,8 @@ labels = ("SwiGLU", "SiLU (d_ff = 1344)", "SiLU (d_ff = 2048)")
 losses: list[tuple[pd.Series, pd.Series]] = []
 for run in runs:
     with open(run / "config.json") as f:
-        config = json.load(f)
-    print(config["num_steps"])
+        config = json.load(f) # Keeping this because it takes less than half a second
+    print(config["num_steps"]) 
     metric_file = run / "metrics.csv"
     df = pd.read_csv(metric_file)
     val = df["validation_loss"]
@@ -28,15 +28,17 @@ plt.title("SwiGLU vs SiLU ablation (validation)")
 plt.ylabel("Cross-Entropy Loss")
 plt.xlabel("Steps")
 plt.legend()
+plt.show()
 fig.savefig("./figures/SiLUAblation.png")
+fig = plt.gcf()
+for i, (steps, val) in enumerate(losses):
+    plt.semilogy(steps, val, label=labels[i])
 plt.ylim(1.2, 1.5)
+plt.title("SwiGLU vs SiLU ablation (validation)")
+plt.ylabel("Cross-Entropy Loss")
+plt.xlabel("Steps")
+plt.legend()
 fig.savefig("./figures/SiLUAblationZoomed.png")
 plt.close()
-diff = pd.Series(np.diff(losses[2][1] - losses[0][1]))
-plt.plot(losses[0][0][:-1], diff)
-plt.title("Difference between SiLU and SwiGLU (parameter_matched)")
-print(f"Final difference: SiLU {losses[1][1].iloc[-1]}, SwiGLU: {losses[0][1].iloc[-1]}")
-plt.show()
-print(losses[2][1][-10:].mean(), losses[0][1][-10:].mean())
-print(f"Final values: SiLU: {losses[2][1].iloc[-1]} SwiGLU: {losses[0][1].iloc[-1]}")
-plt.hist(np.diff(losses[2][1] - losses[0][1]))
+print(f"Final difference: SiLU (2048) {losses[2][1].iloc[-1]}, SwiGLU: {losses[0][1].iloc[-1]}")
+print(f"Last 10 diff: SiLU (2048) {losses[2][1][-10:].mean()}: SwiGLU:  {losses[0][1][-10:].mean()}")
