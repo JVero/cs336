@@ -26,7 +26,7 @@ fig.set_size_inches(20, 10, forward=True)
 for i, (steps, val) in enumerate(losses):
     plt.semilogy(steps, val, label=labels[i])
 plt.title("Tinystories vs Openwebtext on the same model")
-plt.ylabel("Log Cross-Entropy Loss")
+plt.ylabel("Cross-Entropy Loss")
 plt.xlabel("Steps")
 plt.legend()
 fig.savefig("./figures/OWTVsTS.png")

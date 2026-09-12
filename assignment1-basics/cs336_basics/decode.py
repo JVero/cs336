@@ -73,7 +73,7 @@ with torch.no_grad():
         next_tok = torch.multinomial(ps[idx[:last_pos]], num_samples=1)
         
         X_cur = torch.cat([X_cur, idx[next_tok]])
-        if idx[next_tok.item()] == end:
+        if idx[int(next_tok.item())] == end:
             print("<|endoftext|> was emitted")
             break
         print(tok.decode(idx[next_tok].tolist()), end="", flush=True)

@@ -5,6 +5,21 @@ import math
 
 from einops import einsum, rearrange
 
+def softmax(v: torch.Tensor, dim=-1) -> torch.Tensor:
+    # V has arbitrary dims
+    v_max = torch.amax(v, dim=dim, keepdim=True)
+    v = v - v_max
+    ev = torch.exp(v)
+    return ev / ev.sum(dim=dim, keepdim=True)
+
+def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Tensor | None=None) -> torch.Tensor:
+    qkt_scaled = einsum(Q, K / math.sqrt(Q.shape[-1]), "... T1 C,... T2 C -> ... T1 T2")
+    if mask is not None:
+        dtype = qkt_scaled.dtype
+        smallest_value = torch.finfo(dtype).min 
+        qkt_scaled = qkt_scaled.masked_fill(~mask, smallest_value)
+    return softmax(qkt_scaled, dim=-1) @ V
+
 class Linear(nn.Module):
     def __init__(self, in_features: int, out_features: int, device: torch.device | None = None, dtype=None):
         super().__init__()
@@ -36,7 +51,7 @@ class Embedding(nn.Module):
         
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         return self.W[token_ids]
-    
+
 class RMSNorm(nn.Module):
     def __init__(self, d_model: int, eps: float = 1e-5, device=None, dtype=None):
         super().__init__()
@@ -55,7 +70,6 @@ class RMSNorm(nn.Module):
         # X.shape (batch_size, sequence_length, d_model)
         # RMSNorm(ai) = ai * gi / (RMS(a))
         # RMS(a) = sqrt(eps + (1/dmodel) * sum_i^dmodel ai^2)
-        
         original_dt = X.dtype
         X = X.to(torch.float32)
         RMS = RMSNorm.rms(X, self.eps)
@@ -63,7 +77,6 @@ class RMSNorm(nn.Module):
         X = einsum(X, 1/RMS, "... seq_len d_model, ... seq_len -> ... seq_len d_model")
         
         return X.to(original_dt)
-
 
 class SwiGLU(nn.Module):
     # X.shape = (B, d_model)
@@ -132,28 +145,18 @@ class RotaryPositionalEmbedding(nn.Module):
         x = rearrange(x, "... seq_len n_pairs r -> ... seq_len (n_pairs r)")
         return x
     
-def softmax(v: torch.Tensor, dim=-1) -> torch.Tensor:
-    # V has arbitrary dims
-    v_max = torch.amax(v, dim=dim, keepdim=True)
-    v = v - v_max
-    ev = torch.exp(v)
-    return ev / ev.sum(dim=dim, keepdim=True)
-
-def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Tensor | None=None) -> torch.Tensor:
-    qkt_scaled = einsum(Q, K / math.sqrt(Q.shape[-1]), "... T1 C,... T2 C -> ... T1 T2")
-    if mask is not None:
-        dtype = qkt_scaled.dtype
-        smallest_value = torch.finfo(dtype).min 
-        qkt_scaled = qkt_scaled.masked_fill(~mask, smallest_value)
-    return softmax(qkt_scaled, dim=-1) @ V
-    
 class FusedMultiheadSelfAttention(nn.Module):
     def __init__(self, d_model, num_heads, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None):
         super().__init__()
         # x: (batch, seq_len, d_model)
+
+        # Intermediate calculations
+        var = 2 / (d_model + d_model)
+        std = math.sqrt(var)
         
         self.Wfused = Linear(d_model, 3*d_model, dtype=dtype, device=device)
-        
+        nn.init.trunc_normal_(self.Wfused.W, mean=0, std=std,a=-3*std, b=3*std)
+
         self.Wo = Linear(d_model, d_model, dtype=dtype, device=device)
         
         self.num_heads = num_heads
@@ -198,16 +201,11 @@ class TransformerLM(nn.Module):
                  num_layers: int, rope: RotaryPositionalEmbedding | None = None, dtype=None, device=None,
                  ablate_rms: bool = False,use_post_norm=False, use_silu=False):
         super().__init__()
-        if rope is None:
-            print("ABLATING RoPE. RoPE is now NoPE")
-        if use_silu:
-            print("USING SILU")
         self.embedding = Embedding(vocab_size, d_model, device=device, dtype=dtype)
         self.transformer_layers = nn.Sequential(*[Transformer(d_model, num_heads, d_ff, rope, dtype=dtype, device=device, 
                                                               ablate_rms=ablate_rms, use_post_norm=use_post_norm, use_silu=use_silu) for _ in range(num_layers)])
         self.norm = RMSNorm(d_model, device=device,dtype=dtype)
         if ablate_rms:
-            print("ABLATING RMS")
             self.norm = nn.Identity()
         self.linear = Linear(d_model, vocab_size, device=device, dtype=dtype)
         
@@ -218,4 +216,3 @@ class TransformerLM(nn.Module):
         X = self.linear(self.norm(X))
         return X
     
-

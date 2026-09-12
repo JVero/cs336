@@ -223,6 +223,6 @@ if __name__ == "__main__":
                         
     except KeyboardInterrupt:
         print("Training stopped early by user. Saving checkpoint...")
-        save_checkpoint(model, optimizer, step, run_dir / "killed_run.pt")
+        save_checkpoint(model, optimizer, step, run_dir / "killed_run.pt") # type: ignore
     else:
         save_checkpoint(model, optimizer, num_steps, run_dir / "final_checkpoint.pt")
