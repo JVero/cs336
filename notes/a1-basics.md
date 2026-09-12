@@ -473,6 +473,25 @@ Tune the learning rate (2 B200 hrs) (3 points)
 The learning rate has 3 "phases" to speak of. Way too high and you go over the cliff and the model diverges. not too high but suboptimally high, you descend the initial valley faster but the final value it settles on is higher than optimal. Too low and you eventually descend into minima but it takes many many steps (more than the steps we budgeted for in this run)
 
 To find the optimal LR, we did a log-scale sweep between 3e-4 and 1e0. HOnestly when looking at the loss curves, with a fixed step budget in the neighborhood of 5000 steps, the optimium seems to be between 0.0003 and 0.001, and to find the exact optimum we would search within that. The divergence is about 2-3 oom (100x - 1000x) higher than the best value we sampled here (lr=0.001)
+
+The sweep is evaluated in lr_sweep.sh
+
+#!/bin/bash
+```bash
+vals=(
+    3e-4
+    1e-3
+    3e-3
+    1e-2
+    3e-2
+)
+    
+for item in "${vals[@]}"; do
+    uv run -m cs336_basics.training_loop --model tinystories --batch_size 32 --lr $item --label ts-lr-$item --vocab_size 10000 --num_steps 5000 --train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy
+done
+```
+
+
 Figure in figures/LearningRateSweep.png
 
 LR | Steps | Train loss | Valid loss
@@ -600,8 +619,8 @@ Second run `modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2
 ├──────────────────────────┼────────────┼───────────┤
 │ no norm, lr 4e-4         │ 0          │ 1.385     │
 └──────────────────────────┴────────────┴───────────┘
-
-no RMSNorm increases the model's vulnerability to novel inputs, which is amplified by the "higher" learning rate of 1e-3, which brings the weights to a part of the loss landscape that produces unpredictible behavior for rare tokens. 
+Where Spike Rows are defined as a logged row after step 500 where train or val loss is above 3
+no RMSNorm increases the model's vulnerability to novel inputs, which is amplified by the "higher" learning rate of 1e-3, which brings the weights to a part of the loss landscape that produces volatile behavior for rare tokens. This is why a combination of no RMSNorm + a higher learning rate combines to cause loss spikes
 
 The figures that show the spikes are 
 figures/LayerNormAblation.png
@@ -625,7 +644,17 @@ Local command:
 modal command
 `modal run scripts/modal_train.py --flags "--train_data TinyStoriesV2-GPT4-train.npy --val_data TinyStoriesV2-GPT4-valid.npy --num_steps 40000 --lr 1e-3 --batch_size 32 --label rope_ablation --no_rope"`
 
+We compare all the ablations against the regular bs32 run TinyStoriesV2-GPT4-bs32-lr1e-3-0910-210533
+
 Comparing the curves in figures/RopeAblation.png, RoPE is always superior to NoPE, loss-wise. This is not statistically established in the data I collected, because that would require multiple paired samples like this (identical seeds and matched configs otherwise), and would only be a valid conclusion under the tested configs. The difference between runs (visualized at figures/DifferenceInValidationLoss.png) shows that (after step 80) the loss of RoPE was always lower than NoPE, but the difference narrowed over time.
+
+Computed in scratch/rope_ablation_comparison.py
+`uv run -m scratch.rope_ablation_comparison`
+Averaged validation loss (cross-entropy) over final 10 logs
+rope : 1.328
+no_rope : 1.388
+
+Rope has average validation loss of 0.06 lower 
 
 ## swiglu_ablation
 

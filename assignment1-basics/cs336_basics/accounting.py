@@ -1,4 +1,7 @@
 from cs336_basics.transformer import TransformerLM
+from cs336_basics.training import SGD
+import torch
+
 def transformer_accounting():
     vocab_size = 50_257
     context_length = 1_024 # 
@@ -84,3 +87,32 @@ def calculate_flops(vocab_size=50_257,
     n_flops += result["FinalLinear"]
     
     return n_flops, result
+
+def test_lrs():
+    lrs = [1e1, 1e2, 1e3]
+    for lr in lrs:
+        print(f'{6*"="}{lr}{6*"="}')
+        weights = torch.nn.Parameter(5 * torch.randn((10, 10)))
+        opt = SGD([weights], lr=lr)    
+        for t in range(10):
+            opt.zero_grad()
+            loss = (weights**2).mean()
+            print(round(loss.cpu().item(), 2))
+            loss.backward()
+            opt.step()    
+
+def get_activations_count(): # gpt2-xl
+    batch_size = 1
+    n_layers = 48
+    num_heads = 25
+    context_length = 1024
+    d_model = 1600
+    vocab_size = 50257
+    
+    floats = batch_size * \
+    n_layers * 2 * num_heads * context_length * context_length + \
+    (1 + n_layers * 56/3) * context_length * d_model + \
+    2 * context_length * vocab_size
+    print(floats) # 4089153536.0
+    n_bytes = 4 * floats
+    print(n_bytes) # 16356614144.0

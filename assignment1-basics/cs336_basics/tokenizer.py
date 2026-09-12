@@ -82,7 +82,7 @@ class Tokenizer:
                     if not ranks: # there are no merges to do
                         more_ranks = False
                     else:
-                        best_merge, _ = min(ranks, key=lambda k: k[1])
+                        best_merge, _ = min(ranks, key=lambda k: k[1]) # type: ignore
                         i = 0
                         while i < len(ptb):
                             if i != len(ptb) - 1 and (ptb[i], ptb[i+1]) == best_merge:
