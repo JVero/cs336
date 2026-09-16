@@ -86,7 +86,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `benchmarking_script` Benchmarking Script (4 pts)
 - [x] `nsys_profile` Nsight Systems Profiling (5 pts)
 - [x] `mixed_precision_accumulation` Mixed-Precision Accumulation (1 pt)
-- [ ] `benchmarking_mixed_precision` Benchmarking Mixed Precision (2 pts)
+- [x] `benchmarking_mixed_precision` Benchmarking Mixed Precision (2 pts)
 - [ ] `memory_profiling` Memory Profiling (4 pts)
 - [ ] `gradient_checkpointing` Memory-Optimal Gradient Checkpointing (4 pts)
 - [ ] `torch_compile` Torch Compile (2 pts)
