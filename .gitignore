@@ -18,6 +18,7 @@ wandb/
 runs/
 outputs/
 logs/
+*/results/
 
 # Submission tarballs the course scripts produce
 *.tar.gz
@@ -38,3 +39,4 @@ scratch/
 profile*.svg
 assignment1-basics/*_vocab*.json
 assignment1-basics/*_merges*.json
+assignment2-systems/*.csv

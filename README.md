@@ -84,7 +84,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 ### Assignment 2: Systems
 
 - [x] `benchmarking_script` Benchmarking Script (4 pts)
-- [ ] `nsys_profile` Nsight Systems Profiling (5 pts)
+- [x] `nsys_profile` Nsight Systems Profiling (5 pts)
 - [ ] `mixed_precision_accumulation` Mixed-Precision Accumulation (1 pt)
 - [ ] `benchmarking_mixed_precision` Benchmarking Mixed Precision (2 pts)
 - [ ] `memory_profiling` Memory Profiling (4 pts)

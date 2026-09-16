@@ -4,7 +4,7 @@ import math
 from collections.abc import Callable, Iterable
 
 import torch
-
+from cs336_basics.nn_utils import ctx_range
 
 def get_cosine_lr(
     it: int,
@@ -47,6 +47,7 @@ class AdamW(torch.optim.Optimizer):
         defaults = dict(lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
         super().__init__(params, defaults)
 
+    @ctx_range("AdamW")
     def step(self, closure: Callable | None = None):
         loss = None
         if closure is not None:

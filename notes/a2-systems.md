@@ -126,6 +126,114 @@ Without warmup the kernels get constructed in the first evaluation, similar to t
 
 Nsight Systems Profiling (5 points)
 
+Profile Forward and Backward Pass (I chose small and medium) as well as three power-of-two context lengths larger than 128 (256, 512, 1024). Context length of 2048 OOMed for the Medium model on an H100. The template I iterated over the get the profiles is the following command (6 separate runs, this isn't templated in the way its written below)
+
+modal run scripts/modal_nsys.py --gpu H100 --nsys "--pytorch=functions-trace" \
+    --flags "--context_length {256,512,1024} --model {small,medium} --forward --forward_and_back --full_step"
+
+Part A: Referencing results/medium_512/medium_512_nvtx_sum.csv
+**What is the total time spent on your forward pass? Does it match what we had measured before with the Python standard library?**
+10 runs of Forward took a total of 574359656ns range time and 559187362ms proj time, which is a mean of 0.05743s and 0.05591s per iteration, respectively. For future me, range time is timed from the CPU and proj time is timed with respect to the GPU, informally. Compared to timeit 0.05748s, range is within 0.005%. Proj time, comparatively, is 0.1% different. This disparity is probably due to the kernel call itself.
+The standard deviations: 0.00025s (timeit) vs  0.00027s (nsys), each sample is precisely measured between timeit and nsys.
+ 
+Forward times for all models
+Size, Context, Timeit, Nsys
+Small, 256, 0.02542s, 0.0262432083s,
+Small, 512, 0.02207s, 0.02197872437s,
+Small, 1024, 0.04535s, 0.04413475547s, 
+Medium, 256, 0.03955s, 0.0381409661s,
+Medium, 512, 0.05748s, 0.0559187362s,
+Medium, 1024, 0.1258s, 0.1240647279s
+
+Part B: 
+
+Q: What CUDA kernel takes the most cumulative GPU time during the forward pass?
+The cuda kernel that takes the most time during the forward pass is 
+small256:   sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x64x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas <- this one is different from the other 2
+small512:   sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas
+small1024:  sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas
+medium256:  sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x256x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas <- this one is different from the other 2
+medium512:  sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas
+medium1024: sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas
+
+Q: How many times is this kernel invoked during a single forward pass of your model?
+small256: 84 invocations 🤔 🤨
+small512: 61 invocations
+small1024: 97 invocations
+medium256: 48 invocations??? 
+medium512: 169 invocations
+medium1024: 193 invocations
+
+Q: Is it the same kernel that takes the most runtime when you do both forward and backward passes?
+small256:  yes sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x64x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas
+small512:  no void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nt_align1>(T1::Params)
+small1024: yes sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas
+medium256:  no void cutlass::Kernel2<cutlass_80_simt_sgemm_256x128_8x4_nn_align1>(T1::Params)
+medium512:  yes sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas
+medium1024: yes sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas
+
+Part C:
+What other kernels besides matrix multiplies do you see accounting for non-trivial CUDA runtime in the forward pass?
+The elementwise kernels, reduce kernels (Mean and Max) and concatenating which is done in something like RoPE
+
+small256
+Total Time, type of kernel
+4521565, elementwise mult	
+2131294, elementwise mult	
+1813504, elementwise add
+1362334, elementwise divide
+1329311, concatenate array
+1182144, max calculation
+1173663, elementwise where
+1108224, elementwise add
+1050943, elementwise copy
+973088, mean calculation
+In total, these are about 16,600,000ns , out of a total of 90,870,000ns in forward passes, so it takes about 18% of the entire Forward pass.
+
+For each of the rest, I'll report the percent of non-matmul on total time in the forward pass
+small512, total 188e6, 47e6 nonmm -> 25% total runtime
+small1024, total 422e6, 142e6, -> 33% total runtime
+medium256, total 254e6, 36e6, -> 14% total runtime
+medium512, total 529e6, 119e6,  -> 22.4% total runtime
+medium1024, total 1214e6, 375e6 nonmm -> 30% total runtime
+
+Part D:
+**How does the fraction of time spent on matrix multiplication change, compared to doing inference (forward pass only)?**
+When doing the full step with the optimizer,
+
+Profile running one complete training step with your implementation of AdamW (i.e., the forward pass, computing the loss and running a backward pass, and finally an optimizer step, as you’d do during training). How does the fraction of time spent on matrix multiplication change, compared to doing inference (forward pass only)? How about other kernels?
+Looking at
+
+to get full_AdamW
+modal run scripts/modal_nsys.py --gpu H100 --label full_AdamW --nsys "--pytorch=functions-trace" \
+    --flags "--context_length 512 --model medium --forward --forward_and_back --full_step"
+
+to get forward_only:
+modal run scripts/modal_nsys.py --gpu H100 --label forward_only --nsys "--pytorch=functions-trace" \
+    --flags "--context_length 512 --model medium --forward"
+
+medium512_full_AdamW_cuda_gpu_kern_sum vs 
+medium512_forwardonly_cuda_gpu_kern_sum
+sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_kernel__5x_cublas is 67.5% of total execution time in forward only, yet only 19.8% of total execution time in a full step, while their raw execution times are within 0.4% of each other (35900544ns forward only vs 35773616ns). For AdamW, 113451005ns of 180973066ns (approximately 63%) of function runtime comes from functions containining the substring "gemm" or "cublas", while for the pure forward, that ratio is 39204593ns vs 53205067ns (approximately 74%). The other kernels are the complement of that, so 37% are non-MatMuls in the Full Step AdamW version, and 26% are non-MatMuls in the pure forward.
+
+This was done for medium 512 only.
+
+Part E:
+**Compare the runtime of the softmax operation versus the matrix multiplication operations within the self-attention layer of your model during a forward pass. How does the difference in runtimes compare to the difference in FLOPs?**
+These numbers are sourced from medium_512_nvtx_kern_sum, inside the :Softmax range, and :Self-Attention range
+The runtime in softmax in medium512 is approximately 171ms based on that.
+The runtime for the matmuls within a all self-attention layers (Filtered by ":Self-attention" with the final 2 kernel containing gemm or cublas (the first one is the projections which we're not counting here)) is 98ms, for QKt and PV.
+
+Softmax has a much higher ratio of runtime to flops calculated, so it is less efficient.
+
+Flops of self-attn vs softmax -> (8BTCC + 4BTTC) / (5BHTT) = (8CC + 4TC) / (5HT)
+
+For medium 512 (C = 1024, H = 16, T = 512) that is about 256. So 380 ms of matmul against 171 ms of softmax, with 256x the FLOPs.
+so the efficiency ratio of matmuls vs softmax is 256/(380/171) -> matmuls are about 115x "denser" than softmax with respect to compute utilization
+
+This happens because softmax requires 5 separate passes over the matrix to do the intermediate calculations, while matmuls can do more simultaneous calculations per step
+medium1024 626ms for softmax vs 863ms selfattn -> 1.36x more time
+small256 15ms vs - you know what, I'm only doing this for medium with 512 context.. 
 
 
 ## mixed_precision_accumulation

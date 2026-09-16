@@ -14,6 +14,7 @@ from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
 from cs336_basics.nn_utils import softmax
+from cs336_basics.nn_utils import cross_entropy, ctx_range
 
 logger = logging.getLogger(__name__)
 
@@ -477,6 +478,7 @@ class CausalMultiHeadSelfAttention(nn.Module):
 
         self.positional_encoder: RotaryEmbedding | None = positional_encoder  # RoPE
 
+    @ctx_range("Self-attention")
     def forward(
         self, x: Float[Tensor, " ... seq d_k"], token_positions: Int[Tensor, " ... seq"] | None = None
     ) -> Float[Tensor, " ... seq d_v"]:

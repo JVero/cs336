@@ -8,7 +8,7 @@ import torch
 
 from cs336_basics.model import BasicsTransformerLM
 from cs336_basics.data import get_batch
-from cs336_basics.nn_utils import cross_entropy
+from cs336_basics.nn_utils import cross_entropy, ctx_range
 from cs336_basics.optimizer import AdamW
 
 model_parser = argparse.ArgumentParser()
@@ -82,28 +82,38 @@ bench_parser.add_argument("--forward", action="store_true")
 bench_parser.add_argument("--forward_and_back", action="store_true")
 bench_parser.add_argument("--full_step", action="store_true")
 bench_parser.add_argument("--warmup_steps", type=int, default=5)
-bench_parser.add_argument("--models",nargs="+",  help="The max size the run will go until", choices=list(configs.keys()), required=True)
+bench_parser.add_argument("--model",  help="The max size the run will go until", choices=list(configs.keys()), required=True)
 
 bench_parser.add_argument("--of_name", required=True)
 
-def sync(device):
+def sync(device=None):
+    
     if device == "mps":
         torch.mps.synchronize()
     elif device == "cuda":
         torch.cuda.synchronize()
+    elif device == "cpu":
+        pass # its a no-op
     else:
-        torch.cpu.synchronize() # no-op
-        
+        if torch.mps.is_available():
+            device = "mps"
+        elif torch.cuda.is_available():
+            device = "cuda" 
+        sync(device=device)
+    
+@ctx_range("Forward")
 def forward(model, X, device):
     y = model(X)
     sync(device)
 
+@ctx_range("Forward and Back")
 def forward_and_backward(model, X, Y, loss_fn, device):
     y_pred = model(X)
     loss = loss_fn(y_pred, Y)
     loss.backward()
     sync(device)
 
+@ctx_range("Full Step")
 def full_step(model, X, Y, loss_fn, optimizer: torch.optim.Optimizer, device):
     optimizer.zero_grad()
     y_pred = model(X)
@@ -154,32 +164,34 @@ def run_profile(label: str, overridden_args: dict, model_args, bench_args):
     loss_fn = cross_entropy
     if bench_args.warmup_steps > 0:
         print("Warming up...")
-        for _ in range(bench_args.warmup_steps):
-            if bench_args.forward:
-                f()
-            if bench_args.forward_and_back:
-                fandb()
-            if bench_args.full_step:
-                fstep()
+        with ctx_range("Warmup"):
+            for _ in range(bench_args.warmup_steps):
+                if bench_args.forward:
+                    f()
+                if bench_args.forward_and_back:
+                    fandb()
+                if bench_args.full_step:
+                    fstep()
     ### Mac doens't have enough VRAM for this
     if label in ["large", "xl", "10b"] and device == "mps":
         bench_args.full_step = None
     print(f"Number of steps: {bench_args.num_steps}")
     results = []
-    if bench_args.forward:
-        print("Running forward...")
-        result = timeit.repeat(f, number=bench_args.num_steps, repeat=bench_args.num_repeats)
-        results.extend([f(result) for f in [np.mean, np.std]])
-    if bench_args.forward_and_back:
-        print("Running forward and backward...")
-        result = timeit.repeat(fandb, number=bench_args.num_steps, repeat=bench_args.num_repeats)
-        results.extend([f(result) for f in [np.mean, np.std]])
-    if bench_args.full_step:
-        print("Running full training step...")
-        result = timeit.repeat(fstep, number=bench_args.num_steps, repeat=bench_args.num_repeats)
-        results.extend([f(result) for f in [np.mean, np.std]])
-    with open(bench_args.of_name, "a") as f:
-        f.write(label +","+ ",".join([str(round(r, 5)) for r in results])+"\n")
+    with ctx_range("Measurement"):
+        if bench_args.forward:
+            print("Running forward...")
+            result = timeit.repeat(f, number=bench_args.num_steps, repeat=bench_args.num_repeats)
+            results.extend([f(result) for f in [np.mean, np.std]])
+        if bench_args.forward_and_back:
+            print("Running forward and backward...")
+            result = timeit.repeat(fandb, number=bench_args.num_steps, repeat=bench_args.num_repeats)
+            results.extend([f(result) for f in [np.mean, np.std]])
+        if bench_args.full_step:
+            print("Running full training step...")
+            result = timeit.repeat(fstep, number=bench_args.num_steps, repeat=bench_args.num_repeats)
+            results.extend([f(result) for f in [np.mean, np.std]])
+    with open(bench_args.of_name, "a") as fo:
+        fo.write(label +","+ ",".join([str(round(r, 5)) for r in results])+"\n")
     return results
 
 if __name__ == "__main__":
@@ -196,10 +208,10 @@ if __name__ == "__main__":
     with open(bench_args.of_name, "w+") as f:
         f.write(header)
     
-    run_configs = {k: configs[k] for k in bench_args.models}
-    for k, v in run_configs.items():    
-        try:
-            run_profile(k, v, model_args, bench_args)
-        except:
-            print(k, " went OOM")
-            clear_cache(model_args.device)
+    k, v = (bench_args.model, configs[bench_args.model])
+    try:
+        run_profile(k, v, model_args, bench_args)
+    except Exception as E:
+        print(E)
+        print(k, " went OOM")
+        clear_cache(model_args.device)
