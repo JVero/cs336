@@ -6,10 +6,17 @@ script writes is copied back to the laptop when the run ends.
 
 Launch (from the workspace root). --flags takes the bench script's usual flags. Leave out
 --device and --of_name; the launcher sets those and refuses to start if they are present.
-    modal run scripts/modal_bench.py --flags "--context_length 512 --models large xl --forward --forward_and_back --full_step"
+    modal run scripts/modal_bench.py --flags "--context_length 512 --model large --forward --forward_and_back --full_step"
 
 The CSV lands in assignment2-systems/results/<gpu>_<timestamp>.csv (override with --out) and
-is also printed. The same file is copied to the cs336-runs volume at /a2/<gpu>_<timestamp>.csv
+is also printed. It is the raw artifact of the run. The launcher then appends one row per timed
+pass to assignment2-systems/results/bench_log.csv, the long-format log across launches: the
+flags as sent (model, context_length, mixed_precision, ...; a flag left at the bench script's
+default stays blank), gpu, pass, mean, std, exit code, the per-launch CSV, and the exact
+command the container ran. A run that dies before writing a row still gets a log line with
+blank numbers and its exit code. If the log and a per-launch CSV ever disagree, the CSV wins.
+
+The per-launch file is also copied to the cs336-runs volume at /a2/<gpu>_<timestamp>.csv
 before the container exits, including after Ctrl+C, so rows written before an interrupt or a
 crash are not lost. Fetch one with:
     modal volume get cs336-runs /a2/<name>.csv assignment2-systems/results/<name>.csv
@@ -20,6 +27,8 @@ Default GPU is H100 (80 GB, about $4/h). A100-80GB is the cheaper 80 GB option (
 $2.50/h). Anything with 24 GB (A10G, L4) fits at most the medium size.
 """
 
+import argparse
+import csv
 import datetime
 import pathlib
 import shlex
@@ -33,6 +42,15 @@ A2 = WORKSPACE / "assignment2-systems"
 REMOTE_A2 = "/root/cs336/assignment2-systems"
 REMOTE_CSV = "/tmp/bench.csv"
 RUNS_MOUNT = "/runs"
+LOG = A2 / "results" / "bench_log.csv"
+
+# Flags copied into the log as sent. Absent means the bench script's default applied.
+LOGGED_VALUE_FLAGS = ("model", "context_length", "batch_size", "num_steps", "num_repeats", "warmup_steps")
+LOGGED_SWITCH_FLAGS = ("mixed_precision", "compile")
+LOG_COLUMNS = [
+    "timestamp", "gpu", *LOGGED_VALUE_FLAGS, *LOGGED_SWITCH_FLAGS,
+    "pass", "mean", "std", "exit_code", "run_csv", "command",
+]
 
 app = modal.App("cs336-a2")
 runs_vol = modal.Volume.from_name("cs336-runs", create_if_missing=True)
@@ -63,28 +81,75 @@ image = (
 
 
 @app.function(image=image, gpu="H100", volumes={RUNS_MOUNT: runs_vol}, timeout=3600)
-def bench(flags: list[str], name: str) -> tuple[int, str]:
+def bench(flags: list[str], name: str) -> tuple[int, str, str]:
+    """Returns (exit code, the CSV text the bench script wrote, the exact command run)."""
     cmd = [
         "python", "-m", "cs336_systems.bench_script",
         "--device", "cuda",
         "--of_name", REMOTE_CSV,
         *flags,
     ]
-    print("$", " ".join(shlex.quote(c) for c in cmd), flush=True)
+    command = " ".join(shlex.quote(c) for c in cmd)
+    print("$", command, flush=True)
     subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], check=False)
-    csv = pathlib.Path(REMOTE_CSV)
+    csv_path = pathlib.Path(REMOTE_CSV)
     returncode = -1
     try:
         returncode = subprocess.run(cmd, cwd=REMOTE_A2, check=False).returncode
     finally:
         # Runs on Ctrl+C and on a crash too, so rows the script already wrote survive on the volume.
-        if csv.exists():
+        if csv_path.exists():
             keep = pathlib.Path(RUNS_MOUNT) / "a2" / f"{name}.csv"
             keep.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(csv, keep)
+            shutil.copyfile(csv_path, keep)
             runs_vol.commit()
-            print(f"\n{csv.read_text()}(also on volume cs336-runs at /a2/{name}.csv)", flush=True)
-    return returncode, csv.read_text() if csv.exists() else ""
+            print(f"\n{csv_path.read_text()}(also on volume cs336-runs at /a2/{name}.csv)", flush=True)
+    return returncode, csv_path.read_text() if csv_path.exists() else "", command
+
+
+def flag_values(flag_list: list[str]) -> dict[str, str]:
+    """The logged flags exactly as sent. A value flag that was not passed is ''."""
+    parser = argparse.ArgumentParser(add_help=False)
+    for flag in LOGGED_VALUE_FLAGS:
+        parser.add_argument(f"--{flag}", default="")
+    for flag in LOGGED_SWITCH_FLAGS:
+        parser.add_argument(f"--{flag}", action="store_true")
+    known, _ = parser.parse_known_args(flag_list)
+    return vars(known)
+
+
+def bench_rows(csv_text: str) -> list[tuple[str, str, str]]:
+    """(pass, mean, std) per timed pass from the CSV bench_script writes. Empty if header-only.
+
+    The header is `label,<pass> mean,<pass> std,...`; a data row can be shorter than the header
+    when the script dropped a pass after writing it, so missing cells stay blank.
+    """
+    lines = [line for line in csv_text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return []
+    header = lines[0].split(",")[1:]
+    passes = [column[: -len(" mean")] for column in header if column.endswith(" mean")]
+    rows = []
+    for line in lines[1:]:
+        cells = line.split(",")[1:]
+        for i, name in enumerate(passes):
+            pair = cells[2 * i : 2 * i + 2]
+            rows.append((name, *pair, *[""] * (2 - len(pair))))
+    return rows
+
+
+def append_log(log: pathlib.Path, base: dict[str, str], rows: list[tuple[str, str, str]]) -> int:
+    """Append one line per timed pass (or one blank-numbered line if there were none). Returns the count."""
+    lines = rows or [("", "", "")]
+    log.parent.mkdir(parents=True, exist_ok=True)
+    new_file = not log.exists()
+    with log.open("a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=LOG_COLUMNS)
+        if new_file:
+            writer.writeheader()
+        for name, mean, std in lines:
+            writer.writerow({**base, "pass": name, "mean": mean, "std": std})
+    return len(lines)
 
 
 @app.local_entrypoint()
@@ -93,20 +158,31 @@ def main(flags: str, gpu: str = "H100", out: str = "", timeout_hours: float = 1.
     for owned in ("--device", "--of_name"):
         if owned in flag_list:
             raise SystemExit(f"{owned} is set by the launcher; drop it from --flags (use --out for the local CSV path)")
-    name = f"{gpu}_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    started = datetime.datetime.now()
+    name = f"{gpu}_{started.strftime('%Y%m%d-%H%M%S')}"
     path = pathlib.Path(out) if out else A2 / "results" / f"{name}.csv"
     fn = bench.with_options(gpu=gpu, timeout=int(timeout_hours * 3600))
     try:
-        returncode, csv = fn.remote(flag_list, name)
+        returncode, csv_text, command = fn.remote(flag_list, name)
     except KeyboardInterrupt:
         print(f"\ninterrupted; rows written before that are on the volume. Fetch with:\n"
               f"  modal volume get cs336-runs /a2/{name}.csv {path}")
         raise
-    if csv:
+    if csv_text:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(csv)
-        print(f"\n{csv}wrote {path}")
+        path.write_text(csv_text)
+        print(f"\n{csv_text}wrote {path}")
     else:
         print("\nno CSV came back")
+    base = {
+        "timestamp": started.isoformat(timespec="seconds"),
+        "gpu": gpu,
+        **flag_values(flag_list),
+        "exit_code": returncode,
+        "run_csv": str(path.relative_to(WORKSPACE)) if path.resolve().is_relative_to(WORKSPACE) else str(path),
+        "command": command,
+    }
+    n = append_log(LOG, base, bench_rows(csv_text))
+    print(f"logged {n} row(s) to {LOG.relative_to(WORKSPACE)}")
     if returncode != 0:
         raise SystemExit(f"bench_script exited with code {returncode}")

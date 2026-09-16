@@ -239,17 +239,68 @@ small256 15ms vs - you know what, I'm only doing this for medium with 512 contex
 ## mixed_precision_accumulation
 
 Mixed-Precision Accumulation (1 point)
+F32 + F32,       tensor(10.0001) <- 0.001% error
+F16 + F16,       tensor(9.9531, dtype=torch.float16) <- ~0.5% error
+F32 + F16,       tensor(10.0021) <- 0.02% error
+F32 + (F32)F16   tensor(10.0021) <- 0.02% error
 
+The first approach is the most precise, but uses twice the amount of memory for the entire step. The second approach uses the least amount of memory but has about .5% error over 1000 steps, which would compound quickly over long training sessions (the number increments by 9.95 instead of 10, so 0.05/10 = 0.005 = 0.5%).The third and fourth runs have bit-identical results, which implies that `tensor(0, dtype=torch.float32) + tensor(0.01, dtype=torch.float16)` implicitly upcasts the torch.float16 when necessary.
 
 ## benchmarking_mixed_precision
 
 Benchmarking Mixed Precision (2 points)
 
+Part A:
+• the model parameters within the autocast context? -> Model parameters are used for matmuls AND reductions (optimizer steps), so the latter necessitates *full precision*.
+• the output of the first feed-forward layer (ToyModel.fc1)? -> FC1 is a matmul so that would be *lower precision*.
+• the output of layer norm (ToyModel.ln)? -> layernorm is a reduction, so it is *full precision*.
+• the model’s predicted logits? -> the logits from from self.fc2 which means it is a matmul, which is *lower precision*.
+• the loss? -> The loss, using cross-entropy, is a reduce rather than a matmul, so this would be *full precision*.
+• the model’s gradients? -> Model gradients are accumulated element-wise, so they would be *full precision*
+
+Part B:
+What parts of layernorm would be sensitive to mixed precision? Layernorm requires dividing by sigma + eps, and eps, by definition is a very small number, which can underflow to 0 in float16. If we use BF16, the smallest normal representable value is about 1e-38, so that underflow issue is not meaningful there. The issue stems from the fact that layernorm requires calculating the variance of the dataset which is a form of accumulation (var = sum((x - E[x])^2/N)), which requires full precision
+
+
+Part C:
+The relevant diff
+```python
+bench_parser.add_argument("--mixed_precision", action="store_true")
+
+model_params=vars(model_args)
+device = model_params.pop("device")
+
+cm = torch.autocast(device) if bench_args.mixed_precision else nullcontext()
+with cm:
+    # rest of code
+```
+The command for both precisions, with their results below:
+
+`modal run scripts/modal_bench.py --gpu H100 --out a2_medium_full.csv --flags "--context_length 512 --model medium --forward --forward_and_back"`
+`modal run scripts/modal_bench.py --gpu H100 --out a2_medium_mixed.csv --flags "--mixed_precision --context_length 512 --model medium --forward --forward_and_back"`
+gpu,model_size,context_length,precision,forward mean,forward std, forward and back mean, forward and back std
+H100,small,256,full,  0.02542,0.00125,0.07571,0.00717
+H100,small,256,mixed, 0.01565,0.00048,0.04093,0.00167
+
+H100,small,512,full,  0.02207,0.00067,0.06455,0.00087
+H100,small,512,mixed, 0.01559,0.00068,0.04083,0.00119
+
+H100,small,1024,full, 0.04535,0.00054,0.13749,0.00024
+H100,small,1024,mixed,0.02248,0.00055,0.06673,0.00043
+
+H100,medium,256,full,  0.03955,0.00041,0.10255,0.0014
+H100,medium,256,mixed, 0.02999,0.00101,0.08295,0.00164
+
+H100,medium,512,full,  0.05698,0.00073,0.17052,0.0003
+H100,medium,512,mixed, 0.02243,0.0003, 0.07035,0.0016
+
+H100,medium,1024,full, 0.1258, 0.00022,0.38289,0.00024
+H100,medium,1024,mixed,0.05696,0.00046,0.17122,0.00034
 
 ## memory_profiling
 
 Memory Profiling (4 points)
-
+What parts of layer normalization are sensitive to mixed precision?
 
 ## gradient_checkpointing
 
