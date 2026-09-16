@@ -39,4 +39,4 @@ scratch/
 profile*.svg
 assignment1-basics/*_vocab*.json
 assignment1-basics/*_merges*.json
-assignment2-systems/*.csv
+assignment2-systems/*/*.csv
