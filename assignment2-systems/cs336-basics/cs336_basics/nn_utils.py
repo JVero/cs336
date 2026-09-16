@@ -1,6 +1,19 @@
 import torch
+import contextlib
 
+import torch.cuda.nvtx as nvtx
 
+class MacCTX(contextlib.ContextDecorator):
+    def __init__(self, description):
+        pass
+    def __enter__(self):
+        pass
+    def __exit__(self, *args):
+        pass
+
+ctx_range = nvtx.range if torch.cuda.is_available() else MacCTX
+
+@ctx_range("Softmax")
 def softmax(x, dim=-1):
     rescaled_input = x - torch.max(x, dim=dim, keepdim=True)[0]
     exponentiated_rescaled_input = torch.exp(rescaled_input)

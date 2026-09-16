@@ -5,21 +5,51 @@ in a Modal function: assignment2-systems is mounted, deps come from its uv.lock,
 on the image from NVIDIA's CUDA apt repo, and the .nsys-rep and CSV the run writes are copied back
 to the laptop when it ends.
 
-Launch (from the workspace root). --flags takes the bench script's usual flags; --nsys takes the
-flags for `nsys profile` (see handout section 2.1.4). Leave out --device and --of_name from --flags
-and -o/--output and -f/--force-overwrite from --nsys; the launcher sets those and refuses to start
-if they are present.
-    modal run scripts/modal_nsys.py --gpu A10G --nsys "--trace=cuda,nvtx --sample=none" \
-        --flags "--context_length 128 --models small --warmup_steps 1 --num_repeats 1 --forward"
+Launch (from the workspace root). --flags takes the bench script's usual flags. Leave out --device
+and --of_name; the launcher sets those and refuses to start if they are present.
+    modal run scripts/modal_nsys.py --gpu H100 \
+        --flags "--context_length 512 --model small --forward --forward_and_back --full_step"
 
-Outputs land in assignment2-systems/results/<gpu>_<timestamp>.nsys-rep and .csv (override the
-stem with --out) and the CSV is also printed. Both files are copied to the cs336-runs volume at
-/a2/<gpu>_<timestamp>.* before the container exits, including after Ctrl+C, so a profile written
-before an interrupt or a crash is not lost. Fetch one with:
-    modal volume get cs336-runs /a2/<name>.nsys-rep assignment2-systems/results/<name>.nsys-rep
+`nsys profile` always runs with the NSYS_BASE flags below: trace CUDA and NVTX, no CPU sampling,
+and record only the bench script's "Measurement" NVTX range. bench_script wraps its warmup in a
+"Warmup" range and its timed loops in "Measurement", so the warmup never enters the profile and
+the stats reports below are warmup-free without any filtering. Recording starts when Measurement
+is pushed. With --capture-range-end=stop it ends when Measurement is popped and the script runs
+on to write its timing CSV. (The nsys default, stop-shutdown, ends the nsys session at that point
+and sends the script SIGTERM, since --kill defaults to sigterm, which can land before the CSV
+write.) Nothing after the first Measurement range is recorded; bench_script profiles one model
+per call, so that is the whole run. The capture only matches because NSYS_BASE also sets
+NSYS_NVTX_PROFILER_REGISTER_ONLY=0 in the script's environment: by default nsys compares the
+capture-range name only against NVTX registered strings, and torch.cuda.nvtx pushes plain ones.
+Without it the range never matches and nsys writes no report; the launcher then exits non-zero
+with "no .nsys-rep came back".
+
+--nsys takes extra flags for `nsys profile`, appended after NSYS_BASE, for example
+--nsys "--pytorch=autograd-nvtx" (see handout section 2.1.4). Leave out the flags NSYS_BASE
+already sets and -o/--output and -f/--force-overwrite; the launcher refuses them.
+
+Outputs land in one directory per run, assignment2-systems/results/<model>_<context_length>/,
+named from --flags (small_512 for --model small --context_length 512). It holds <name>.nsys-rep,
+<name>.csv (the timing CSV, also printed) and the stats CSVs described below. The launcher
+refuses to start if that directory already has files in it; pass --out with the same directory
+to overwrite them on purpose, or another directory to keep both. The same files are copied to
+the cs336-runs volume at /a2/<name>/ before the container exits, including after Ctrl+C, so a
+profile written before an interrupt or a crash is not lost. Fetch a run with:
+    modal volume get cs336-runs /a2/<name> assignment2-systems/results/
 Use --detach for a run you do not want tied to the terminal; then the files only reach the volume,
 not the laptop, and `modal app logs cs336-a2` follows it. Open .nsys-rep files in the Nsight
 Systems desktop app.
+
+After the profile, `nsys stats` runs in the same container and its tables come back as CSVs, one
+file per report: <name>_<report>.csv next to the .nsys-rep. These are the same reports as the
+desktop app's Stats System View. nsys computes them by exporting the profile to SQLite and running
+one query per report; the SQLite file stays in the container. The default set below can be
+replaced with --reports, a comma-separated list of names from `nsys stats --help-reports`. Times
+are nanoseconds and the column headers say so.
+    nvtx_sum            wall-clock of each NVTX range on the CPU (the timeit counterpart)
+    nvtx_gpu_proj_sum   each NVTX range projected onto the GPU: time the GPU was busy inside it
+    nvtx_kern_sum       kernels grouped by the NVTX range that launched them
+    cuda_gpu_kern_sum   kernels over the whole profile
 
 Cheap checks before spending GPU time:
     modal run scripts/modal_nsys.py::check
@@ -29,14 +59,13 @@ cheapest GPU (A10G) with the small model before switching to H100.
 
 Modal sandboxes containers with gVisor, which does not hand out the permissions two nsys features
 need: CPU sampling (perf_event_open) and --gpu-metrics-devices (hardware counters). CUDA API,
-kernel, and NVTX tracing do not need them. If a run complains about sampling, add
---sample=none --cpuctxsw=none to --nsys.
+kernel, and NVTX tracing do not need them. That is why NSYS_BASE has --sample=none; if a run
+still complains, add --cpuctxsw=none to --nsys.
 
 Default GPU is H100 (80 GB, about $4/h). A100-80GB is the cheaper 80 GB option (about
 $2.50/h). Anything with 24 GB (A10G, L4) fits at most the medium size.
 """
 
-import datetime
 import pathlib
 import shlex
 import shutil
@@ -48,8 +77,22 @@ WORKSPACE = pathlib.Path(__file__).resolve().parent.parent
 A2 = WORKSPACE / "assignment2-systems"
 REMOTE_A2 = "/root/cs336/assignment2-systems"
 REMOTE_CSV = "/tmp/bench.csv"
-REMOTE_REP_STEM = "/tmp/profile"  # nsys appends .nsys-rep
+REMOTE_REP_STEM = "/tmp/profile"  # nsys appends .nsys-rep; `nsys stats` appends _<report>.csv
 RUNS_MOUNT = "/runs"
+DEFAULT_REPORTS = "nvtx_sum,nvtx_gpu_proj_sum,nvtx_kern_sum,cuda_gpu_kern_sum"
+# Every profile: CUDA + NVTX tracing, no CPU sampling (gVisor), and record only the bench script's
+# "Measurement" NVTX range so the warmup stays out of the file. See the module docstring.
+# NSYS_NVTX_PROFILER_REGISTER_ONLY=0: without it nsys only matches the capture range against NVTX
+# *registered* strings, torch.cuda.nvtx pushes plain strings, so the range never matches and nsys
+# writes no report at all (six H100 runs on 2026-09-14 came back with timing CSVs and nothing else).
+NSYS_BASE = [
+    "--trace=cuda,nvtx",
+    "--sample=none",
+    "--capture-range=nvtx",
+    "--nvtx-capture=Measurement",
+    "--capture-range-end=stop",
+    "--env-var=NSYS_NVTX_PROFILER_REGISTER_ONLY=0",
+]
 
 # Version from the CUDA apt repo's Debian 12 tree. 2025.6.3 pairs with CUDA 13.2 and covers the
 # 13.0 runtime torch 2.11 bundles; Modal hosts run driver 580.95 (CUDA 13.0), so newer works too.
@@ -105,9 +148,13 @@ def check() -> str:
 
 
 @app.function(image=image, gpu="H100", volumes={RUNS_MOUNT: runs_vol}, timeout=3600)
-def profile(flags: list[str], nsys_flags: list[str], name: str) -> tuple[int, str, bytes]:
+def profile(flags: list[str], nsys_flags: list[str], name: str, reports: str) -> tuple[int, str, bytes, dict[str, str]]:
+    """Returns (exit code, timing CSV text, .nsys-rep bytes, {"_<report>.csv": CSV text, ...}).
+
+    `nsys_flags` go after NSYS_BASE; `reports` is the comma-separated list for `nsys stats --report`.
+    """
     cmd = [
-        "nsys", "profile", *nsys_flags,
+        "nsys", "profile", *NSYS_BASE, *nsys_flags,
         "--output", REMOTE_REP_STEM, "--force-overwrite", "true",
         "--", "python", "-m", "cs336_systems.bench_script",
         "--device", "cuda",
@@ -121,16 +168,31 @@ def profile(flags: list[str], nsys_flags: list[str], name: str) -> tuple[int, st
     returncode = -1
     try:
         returncode = subprocess.run(cmd, cwd=REMOTE_A2, check=False).returncode
+        if rep.exists():
+            # Writes /tmp/profile_<report>.csv per report (and /tmp/profile.sqlite, the export the
+            # report queries run over, which is not copied back).
+            stats_cmd = [
+                "nsys", "stats", "--report", reports, "--format", "csv",
+                "--output", REMOTE_REP_STEM, "--force-overwrite", "true", str(rep),
+            ]
+            print("$", " ".join(shlex.quote(c) for c in stats_cmd), flush=True)
+            stats_rc = subprocess.run(stats_cmd, check=False).returncode
+            if stats_rc != 0:
+                print(f"nsys stats exited with code {stats_rc}; see its output above", flush=True)
+                if returncode == 0:
+                    returncode = stats_rc
     finally:
         # Runs on Ctrl+C and on a crash too, so whatever nsys and the script already wrote survives
-        # on the volume.
+        # on the volume. Each file is (path, suffix it gets after the run name).
+        stats_files = sorted(rep.parent.glob(f"{rep.stem}_*.csv"))
+        outputs = [(csv, ".csv"), (rep, ".nsys-rep")] + [(p, p.name.removeprefix(rep.stem)) for p in stats_files]
         kept = []
-        for src in (csv, rep):
+        for src, suffix in outputs:
             if src.exists():
-                dst = pathlib.Path(RUNS_MOUNT) / "a2" / f"{name}{src.suffix}"
+                dst = pathlib.Path(RUNS_MOUNT) / "a2" / name / f"{name}{suffix}"
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(src, dst)
-                kept.append(f"/a2/{dst.name}")
+                kept.append(f"/a2/{name}/{dst.name}")
         if kept:
             runs_vol.commit()
         if csv.exists():
@@ -143,6 +205,7 @@ def profile(flags: list[str], nsys_flags: list[str], name: str) -> tuple[int, st
         returncode,
         csv.read_text() if csv.exists() else "",
         rep.read_bytes() if rep.exists() else b"",
+        {suffix: src.read_text() for src, suffix in outputs[2:]},
     )
 
 
@@ -150,8 +213,25 @@ def _has_flag(args: list[str], flag: str) -> bool:
     return any(a == flag or a.startswith(flag + "=") for a in args)
 
 
+def _flag_value(args: list[str], flag: str) -> str | None:
+    """Value of `--flag value` or `--flag=value` in args, None if absent."""
+    for i, a in enumerate(args):
+        if a == flag and i + 1 < len(args):
+            return args[i + 1]
+        if a.startswith(flag + "="):
+            return a.split("=", 1)[1]
+    return None
+
+
 @app.local_entrypoint()
-def main(flags: str, nsys: str = "", gpu: str = "H100", out: str = "", timeout_hours: float = 1.0) -> None:
+def main(
+    flags: str,
+    nsys: str = "",
+    gpu: str = "H100",
+    out: str = "",
+    timeout_hours: float = 1.0,
+    reports: str = DEFAULT_REPORTS,
+) -> None:
     flag_list = shlex.split(flags)
     nsys_list = shlex.split(nsys)
     for owned in ("--device", "--of_name"):
@@ -160,19 +240,34 @@ def main(flags: str, nsys: str = "", gpu: str = "H100", out: str = "", timeout_h
     for owned in ("-o", "--output", "-f", "--force-overwrite"):
         if _has_flag(nsys_list, owned):
             raise SystemExit(f"{owned} is set by the launcher; drop it from --nsys (use --out for the local path)")
-    name = f"{gpu}_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    stem = pathlib.Path(out) if out else A2 / "results" / name
+    for owned in (base.split("=")[0] for base in NSYS_BASE):
+        if _has_flag(nsys_list, owned):
+            raise SystemExit(f"{owned} is set by the launcher (NSYS_BASE); drop it from --nsys or edit NSYS_BASE")
+    report_list = ",".join(r.strip() for r in reports.split(",") if r.strip())
+    if not report_list:
+        raise SystemExit("--reports needs at least one report name")
+    model = _flag_value(flag_list, "--model")
+    ctx = _flag_value(flag_list, "--context_length")
+    if model is None or ctx is None:
+        raise SystemExit("--flags must include --model and --context_length; they name the run")
+    run_dir = pathlib.Path(out) if out else A2 / "results" / f"{model}_{ctx}"
+    name = run_dir.name
+    stem = run_dir / name
+    if not out and run_dir.is_dir() and any(run_dir.iterdir()):
+        raise SystemExit(
+            f"{run_dir} already has files in it; pass --out {run_dir} to overwrite them "
+            f"or --out <other directory> to keep both"
+        )
     csv_path = pathlib.Path(f"{stem}.csv")
     rep_path = pathlib.Path(f"{stem}.nsys-rep")
     fn = profile.with_options(gpu=gpu, timeout=int(timeout_hours * 3600))
     try:
-        returncode, csv, rep = fn.remote(flag_list, nsys_list, name)
+        returncode, csv, rep, stats_csvs = fn.remote(flag_list, nsys_list, name, report_list)
     except KeyboardInterrupt:
-        print(f"\ninterrupted; files written before that are on the volume. Fetch with:\n"
-              f"  modal volume get cs336-runs /a2/{name}.nsys-rep {rep_path}\n"
-              f"  modal volume get cs336-runs /a2/{name}.csv {csv_path}")
+        print(f"\ninterrupted; files written before that are on the volume. Fetch the run with:\n"
+              f"  modal volume get cs336-runs /a2/{name} {run_dir.parent}/")
         raise
-    stem.parent.mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=True)
     if csv:
         csv_path.write_text(csv)
         print(f"\n{csv}wrote {csv_path}")
@@ -181,7 +276,14 @@ def main(flags: str, nsys: str = "", gpu: str = "H100", out: str = "", timeout_h
     if rep:
         rep_path.write_bytes(rep)
         print(f"wrote {rep_path} ({len(rep) / 1e6:.1f} MB)")
-    else:
-        print("no .nsys-rep came back")
+    for suffix, text in sorted(stats_csvs.items()):
+        path = pathlib.Path(f"{stem}{suffix}")
+        path.write_text(text)
+        print(f"wrote {path} ({text.count(chr(10))} rows)")
+    if not stats_csvs:
+        print("no stats CSVs came back")
     if returncode != 0:
         raise SystemExit(f"nsys/bench_script exited with code {returncode}")
+    if not rep:
+        raise SystemExit("no .nsys-rep came back: nsys wrote no profile, so the capture range never "
+                         "triggered; check the nsys messages in the log above")
