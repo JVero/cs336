@@ -259,8 +259,7 @@ Part A:
 • the model’s gradients? -> Model gradients are accumulated element-wise, so they would be *full precision*
 
 Part B:
-What parts of layernorm would be sensitive to mixed precision? Layernorm requires dividing by sigma + eps, and eps, by definition is a very small number, which can underflow to 0 in float16. If we use BF16, the smallest normal representable value is about 1e-38, so that underflow issue is not meaningful there. The issue stems from the fact that layernorm requires calculating the variance of the dataset which is a form of accumulation (var = sum((x - E[x])^2/N)), which requires full precision
-
+What parts of layernorm would be sensitive to mixed precision? The major risk of using float16 in LayerNorm stems from the fact that calculating the variance requires squaring numbers, which can potentially overflow, due to the reduced expressible range compared to float32. bfloat16 has an increased expressible range such that overflow is less likely than when using float16 (equally likely to float32), but calculating variance is a reduction (E((x - E[x])^2) is an average of squared numbers), which accumulates errors quickly under bfloat16, as is demonstrated in the problem for mixed_precision_accumulation. Actually, mixed_precision_accumulation is a more accurate approximation than bfloat16 would be, as float16 has 3 more bits of mantissa, so bfloat16 would accumulate errors faster.
 
 Part C:
 The relevant diff
@@ -270,32 +269,50 @@ bench_parser.add_argument("--mixed_precision", action="store_true")
 model_params=vars(model_args)
 device = model_params.pop("device")
 
-cm = torch.autocast(device) if bench_args.mixed_precision else nullcontext()
+cm = torch.autocast(device, dtype=torch.bfloat16) if bench_args.mixed_precision else nullcontext()
 with cm:
     # rest of code
 ```
 The command for both precisions, with their results below:
 
-`modal run scripts/modal_bench.py --gpu H100 --out a2_medium_full.csv --flags "--context_length 512 --model medium --forward --forward_and_back"`
-`modal run scripts/modal_bench.py --gpu H100 --out a2_medium_mixed.csv --flags "--mixed_precision --context_length 512 --model medium --forward --forward_and_back"`
+`modal run scripts/modal_bench.py --gpu H100 --flags "--context_length 512 --model medium --forward --forward_and_back"`
+`modal run scripts/modal_bench.py --gpu H100 --flags "--mixed_precision --context_length 512 --model medium --forward --forward_and_back"`
 gpu,model_size,context_length,precision,forward mean,forward std, forward and back mean, forward and back std
 H100,small,256,full,  0.02542,0.00125,0.07571,0.00717
 H100,small,256,mixed, 0.01565,0.00048,0.04093,0.00167
 
+mixed is about 60% of the runtime of the full, 54% for forward and back
+
 H100,small,512,full,  0.02207,0.00067,0.06455,0.00087
 H100,small,512,mixed, 0.01559,0.00068,0.04083,0.00119
+
+70% of the runtime for forward, 61% for f and b
 
 H100,small,1024,full, 0.04535,0.00054,0.13749,0.00024
 H100,small,1024,mixed,0.02248,0.00055,0.06673,0.00043
 
+50% forward, 49% f and b
+
 H100,medium,256,full,  0.03955,0.00041,0.10255,0.0014
 H100,medium,256,mixed, 0.02999,0.00101,0.08295,0.00164
 
+76% of forward, 80% for f and b
+
 H100,medium,512,full,  0.05698,0.00073,0.17052,0.0003
-H100,medium,512,mixed, 0.02243,0.0003, 0.07035,0.0016
+H100,medium,512,mixed, 0.0323,0.00086, 0.08754,0.00236
+
+56% of the forward, 51% f and b
 
 H100,medium,1024,full, 0.1258, 0.00022,0.38289,0.00024
 H100,medium,1024,mixed,0.05696,0.00046,0.17122,0.00034
+
+44% of forward, 45% of f and b
+
+H100,large,512,full,0.12241,0.00093,0.37097,8e-05
+H100,large,512,mixed,0.04139,0.0008,0.12978,0.00335
+33% of forward, 34% of f and b
+
+All of the model sizes get major speedups using bfloat16, and the gains are similar between forward and forward and backward. The gains grow with context length and model size (larger models get more speedup, larger contexts get more speedup)
 
 ## memory_profiling
 

@@ -11,10 +11,12 @@ Launch (from the workspace root). --flags takes the bench script's usual flags. 
 The CSV lands in assignment2-systems/results/<gpu>_<timestamp>.csv (override with --out) and
 is also printed. It is the raw artifact of the run. The launcher then appends one row per timed
 pass to assignment2-systems/results/bench_log.csv, the long-format log across launches: the
-flags as sent (model, context_length, mixed_precision, ...; a flag left at the bench script's
-default stays blank), gpu, pass, mean, std, exit code, the per-launch CSV, and the exact
-command the container ran. A run that dies before writing a row still gets a log line with
-blank numbers and its exit code. If the log and a per-launch CSV ever disagree, the CSV wins.
+settings the run used (model, context_length, batch_size, ...), gpu, pass, mean, std, exit
+code, the per-launch CSV, and the exact command the container ran. The settings come from the
+bench script itself: the container parses the flags with the script's own argparse definitions
+and reports every value, so defaults appear as their real values and nothing is mirrored here.
+A run that dies before writing a row still gets a log line with blank numbers and its exit
+code. If the log and a per-launch CSV ever disagree, the CSV wins.
 
 The per-launch file is also copied to the cs336-runs volume at /a2/<gpu>_<timestamp>.csv
 before the container exits, including after Ctrl+C, so rows written before an interrupt or a
@@ -27,9 +29,9 @@ Default GPU is H100 (80 GB, about $4/h). A100-80GB is the cheaper 80 GB option (
 $2.50/h). Anything with 24 GB (A10G, L4) fits at most the medium size.
 """
 
-import argparse
 import csv
 import datetime
+import json
 import pathlib
 import shlex
 import shutil
@@ -44,13 +46,21 @@ REMOTE_CSV = "/tmp/bench.csv"
 RUNS_MOUNT = "/runs"
 LOG = A2 / "results" / "bench_log.csv"
 
-# Flags copied into the log as sent. Absent means the bench script's default applied.
-LOGGED_VALUE_FLAGS = ("model", "context_length", "batch_size", "num_steps", "num_repeats", "warmup_steps")
-LOGGED_SWITCH_FLAGS = ("mixed_precision", "compile")
-LOG_COLUMNS = [
-    "timestamp", "gpu", *LOGGED_VALUE_FLAGS, *LOGGED_SWITCH_FLAGS,
-    "pass", "mean", "std", "exit_code", "run_csv", "command",
-]
+# Settings copied into the log, by their name in the bench script's argparse namespace.
+LOGGED_SETTINGS = (
+    "model", "context_length", "batch_size", "num_steps", "num_repeats", "warmup_steps",
+    "mixed_precision", "compile",
+)
+LOG_COLUMNS = ["timestamp", "gpu", *LOGGED_SETTINGS, "pass", "mean", "std", "exit_code", "run_csv", "command"]
+
+# Run in the container with the bench script's own argv: prints the settings it would use.
+SETTINGS_PROBE = """
+import json
+from cs336_systems.bench_script import model_parser, bench_parser
+model_args, rest = model_parser.parse_known_args()
+bench_args = bench_parser.parse_args(rest)
+print(json.dumps({**vars(model_args), **vars(bench_args)}))
+"""
 
 app = modal.App("cs336-a2")
 runs_vol = modal.Volume.from_name("cs336-runs", create_if_missing=True)
@@ -81,17 +91,19 @@ image = (
 
 
 @app.function(image=image, gpu="H100", volumes={RUNS_MOUNT: runs_vol}, timeout=3600)
-def bench(flags: list[str], name: str) -> tuple[int, str, str]:
-    """Returns (exit code, the CSV text the bench script wrote, the exact command run)."""
-    cmd = [
-        "python", "-m", "cs336_systems.bench_script",
-        "--device", "cuda",
-        "--of_name", REMOTE_CSV,
-        *flags,
-    ]
+def bench(flags: list[str], name: str) -> tuple[int, str, str, dict]:
+    """Returns (exit code, the CSV text the bench script wrote, the exact command run, the
+    settings the script parsed from that command, or {} if parsing failed)."""
+    argv = ["--device", "cuda", "--of_name", REMOTE_CSV, *flags]
+    cmd = ["python", "-m", "cs336_systems.bench_script", *argv]
     command = " ".join(shlex.quote(c) for c in cmd)
     print("$", command, flush=True)
     subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], check=False)
+    probe = subprocess.run(["python", "-c", SETTINGS_PROBE, *argv], cwd=REMOTE_A2,
+                           capture_output=True, text=True, check=False)
+    settings = json.loads(probe.stdout) if probe.returncode == 0 else {}
+    if not settings:
+        print(f"could not read the script's settings (log columns will be blank):\n{probe.stderr}", flush=True)
     csv_path = pathlib.Path(REMOTE_CSV)
     returncode = -1
     try:
@@ -104,18 +116,7 @@ def bench(flags: list[str], name: str) -> tuple[int, str, str]:
             shutil.copyfile(csv_path, keep)
             runs_vol.commit()
             print(f"\n{csv_path.read_text()}(also on volume cs336-runs at /a2/{name}.csv)", flush=True)
-    return returncode, csv_path.read_text() if csv_path.exists() else "", command
-
-
-def flag_values(flag_list: list[str]) -> dict[str, str]:
-    """The logged flags exactly as sent. A value flag that was not passed is ''."""
-    parser = argparse.ArgumentParser(add_help=False)
-    for flag in LOGGED_VALUE_FLAGS:
-        parser.add_argument(f"--{flag}", default="")
-    for flag in LOGGED_SWITCH_FLAGS:
-        parser.add_argument(f"--{flag}", action="store_true")
-    known, _ = parser.parse_known_args(flag_list)
-    return vars(known)
+    return returncode, csv_path.read_text() if csv_path.exists() else "", command, settings
 
 
 def bench_rows(csv_text: str) -> list[tuple[str, str, str]]:
@@ -163,7 +164,7 @@ def main(flags: str, gpu: str = "H100", out: str = "", timeout_hours: float = 1.
     path = pathlib.Path(out) if out else A2 / "results" / f"{name}.csv"
     fn = bench.with_options(gpu=gpu, timeout=int(timeout_hours * 3600))
     try:
-        returncode, csv_text, command = fn.remote(flag_list, name)
+        returncode, csv_text, command, settings = fn.remote(flag_list, name)
     except KeyboardInterrupt:
         print(f"\ninterrupted; rows written before that are on the volume. Fetch with:\n"
               f"  modal volume get cs336-runs /a2/{name}.csv {path}")
@@ -174,12 +175,13 @@ def main(flags: str, gpu: str = "H100", out: str = "", timeout_hours: float = 1.
         print(f"\n{csv_text}wrote {path}")
     else:
         print("\nno CSV came back")
+    resolved = path.resolve()
     base = {
         "timestamp": started.isoformat(timespec="seconds"),
         "gpu": gpu,
-        **flag_values(flag_list),
+        **{key: settings.get(key, "") for key in LOGGED_SETTINGS},
         "exit_code": returncode,
-        "run_csv": str(path.relative_to(WORKSPACE)) if path.resolve().is_relative_to(WORKSPACE) else str(path),
+        "run_csv": str(resolved.relative_to(WORKSPACE)) if resolved.is_relative_to(WORKSPACE) else str(resolved),
         "command": command,
     }
     n = append_log(LOG, base, bench_rows(csv_text))
