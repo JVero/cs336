@@ -19,6 +19,20 @@ def softmax(x, dim=-1):
     exponentiated_rescaled_input = torch.exp(rescaled_input)
     return exponentiated_rescaled_input / torch.sum(exponentiated_rescaled_input, dim=dim, keepdim=True)
 
+@contextlib.contextmanager
+def memory_snapshot(fname, clean_cache=False, max_entries=1_000_000):
+    torch.cuda.synchronize()
+    if clean_cache:
+        torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.memory._record_memory_history(max_entries=max_entries)
+    try:
+        yield
+    finally:
+        torch.cuda.synchronize()
+        torch.cuda.memory._dump_snapshot(fname)
+        torch.cuda.memory._record_memory_history(enabled=None)
+
 
 def log_softmax(x, dim=-1):
     x_max = torch.max(x, dim=dim, keepdim=True)[0]
