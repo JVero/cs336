@@ -18,15 +18,29 @@ is pushed. With --capture-range-end=stop it ends when Measurement is popped and 
 on to write its timing CSV. (The nsys default, stop-shutdown, ends the nsys session at that point
 and sends the script SIGTERM, since --kill defaults to sigterm, which can land before the CSV
 write.) Nothing after the first Measurement range is recorded; bench_script profiles one model
-per call, so that is the whole run. The capture only matches because NSYS_BASE also sets
-NSYS_NVTX_PROFILER_REGISTER_ONLY=0 in the script's environment: by default nsys compares the
-capture-range name only against NVTX registered strings, and torch.cuda.nvtx pushes plain ones.
-Without it the range never matches and nsys writes no report; the launcher then exits non-zero
-with "no .nsys-rep came back".
+per call, so that is the whole run. The capture only matches because the launcher also sets
+NSYS_NVTX_PROFILER_REGISTER_ONLY=0 in the script's environment (NSYS_ENV below): by default nsys
+compares the capture-range name only against NVTX registered strings, and torch.cuda.nvtx pushes
+plain ones. Without it the range never matches and nsys writes no report; the launcher then exits
+non-zero with "no .nsys-rep came back".
 
 --nsys takes extra flags for `nsys profile`, appended after NSYS_BASE, for example
 --nsys "--pytorch=autograd-nvtx" (see handout section 2.1.4). Leave out the flags NSYS_BASE
-already sets and -o/--output and -f/--force-overwrite; the launcher refuses them.
+already sets and -o/--output, -f/--force-overwrite and --env-var; the launcher refuses them.
+
+--env sets extra environment variables for the bench script, as a comma-separated list of
+NAME=VALUE pairs. They travel on the one --env-var flag nsys accepts, after NSYS_ENV. The case
+that needs it is memory profiling (handout memory_profiling (f)):
+    modal run scripts/modal_nsys.py --gpu H100 --env "PYTORCH_NO_CUDA_MEMORY_CACHING=1" \
+        --nsys "--cuda-memory-usage=true --pytorch=autograd-shapes-nvtx" \
+        --flags "--model xl --context_length 1024 --batch_size 1 --num_repeats 1 --warmup_steps 0 --full_step"
+--cuda-memory-usage records cudaMalloc and cudaFree, and PyTorch's caching allocator only calls
+those when its pool grows, never on a free. After a warmup every step reuses the pool, so a
+profile that starts at "Measurement" holds no memory events at all (xl_1024_memory on
+2026-09-17 came back with no memory table). --warmup_steps 0 puts the first, pool-growing step
+inside the capture; PYTORCH_NO_CUDA_MEMORY_CACHING=1 makes every tensor allocation and free a
+real cudaMalloc/cudaFree, so the memory line also drops where tensors die. That step runs
+slower (each cudaFree synchronizes), so its timing row is not a benchmark.
 
 Outputs land in one directory per run, assignment2-systems/results/<model>_<context_length>/,
 named from --flags (small_512 for --model small --context_length 512). It holds <name>.nsys-rep,
@@ -91,8 +105,10 @@ NSYS_BASE = [
     "--capture-range=nvtx",
     "--nvtx-capture=Measurement",
     "--capture-range-end=stop",
-    "--env-var=NSYS_NVTX_PROFILER_REGISTER_ONLY=0",
 ]
+# Environment for the bench script. nsys takes one --env-var flag holding a comma-separated list
+# of NAME=VALUE pairs; --env appends to this list.
+NSYS_ENV = ["NSYS_NVTX_PROFILER_REGISTER_ONLY=0"]
 
 # Version from the CUDA apt repo's Debian 12 tree. 2025.6.3 pairs with CUDA 13.2 and covers the
 # 13.0 runtime torch 2.11 bundles; Modal hosts run driver 580.95 (CUDA 13.0), so newer works too.
@@ -148,13 +164,16 @@ def check() -> str:
 
 
 @app.function(image=image, gpu="H100", volumes={RUNS_MOUNT: runs_vol}, timeout=3600)
-def profile(flags: list[str], nsys_flags: list[str], name: str, reports: str) -> tuple[int, str, bytes, dict[str, str]]:
+def profile(
+    flags: list[str], nsys_flags: list[str], env: list[str], name: str, reports: str
+) -> tuple[int, str, bytes, dict[str, str]]:
     """Returns (exit code, timing CSV text, .nsys-rep bytes, {"_<report>.csv": CSV text, ...}).
 
-    `nsys_flags` go after NSYS_BASE; `reports` is the comma-separated list for `nsys stats --report`.
+    `nsys_flags` go after NSYS_BASE; `env` is NAME=VALUE pairs added to NSYS_ENV for the bench
+    script; `reports` is the comma-separated list for `nsys stats --report`.
     """
     cmd = [
-        "nsys", "profile", *NSYS_BASE, *nsys_flags,
+        "nsys", "profile", *NSYS_BASE, "--env-var=" + ",".join(NSYS_ENV + env), *nsys_flags,
         "--output", REMOTE_REP_STEM, "--force-overwrite", "true",
         "--", "python", "-m", "cs336_systems.bench_script",
         "--device", "cuda",
@@ -227,6 +246,7 @@ def _flag_value(args: list[str], flag: str) -> str | None:
 def main(
     flags: str,
     nsys: str = "",
+    env: str = "",
     gpu: str = "H100",
     out: str = "",
     timeout_hours: float = 1.0,
@@ -234,15 +254,21 @@ def main(
 ) -> None:
     flag_list = shlex.split(flags)
     nsys_list = shlex.split(nsys)
+    env_list = [e.strip() for e in env.split(",") if e.strip()]
     for owned in ("--device", "--of_name"):
         if _has_flag(flag_list, owned):
             raise SystemExit(f"{owned} is set by the launcher; drop it from --flags (use --out for the local path)")
     for owned in ("-o", "--output", "-f", "--force-overwrite"):
         if _has_flag(nsys_list, owned):
             raise SystemExit(f"{owned} is set by the launcher; drop it from --nsys (use --out for the local path)")
+    if _has_flag(nsys_list, "--env-var"):
+        raise SystemExit("--env-var is set by the launcher; pass the variables with --env instead")
     for owned in (base.split("=")[0] for base in NSYS_BASE):
         if _has_flag(nsys_list, owned):
             raise SystemExit(f"{owned} is set by the launcher (NSYS_BASE); drop it from --nsys or edit NSYS_BASE")
+    for pair in env_list:
+        if "=" not in pair or pair.startswith("="):
+            raise SystemExit(f"--env entries are NAME=VALUE, comma-separated; got {pair!r}")
     report_list = ",".join(r.strip() for r in reports.split(",") if r.strip())
     if not report_list:
         raise SystemExit("--reports needs at least one report name")
@@ -262,7 +288,7 @@ def main(
     rep_path = pathlib.Path(f"{stem}.nsys-rep")
     fn = profile.with_options(gpu=gpu, timeout=int(timeout_hours * 3600))
     try:
-        returncode, csv, rep, stats_csvs = fn.remote(flag_list, nsys_list, name, report_list)
+        returncode, csv, rep, stats_csvs = fn.remote(flag_list, nsys_list, env_list, name, report_list)
     except KeyboardInterrupt:
         print(f"\ninterrupted; files written before that are on the volume. Fetch the run with:\n"
               f"  modal volume get cs336-runs /a2/{name} {run_dir.parent}/")

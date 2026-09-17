@@ -25,6 +25,16 @@ crash are not lost. Fetch one with:
 Use --detach for a run you do not want tied to the terminal; then the CSV only reaches the
 volume, not the laptop, and `modal app logs cs336-a2` follows it.
 
+With --memory_profiling in --flags, the bench script also dumps one memory snapshot per timed
+pass (forward.pkl, forward_and_back.pkl, full_step.pkl) into its working directory. The
+launcher copies those to the volume at /a2/<gpu>_<timestamp>/<pass>.pkl and downloads them to
+assignment2-systems/results/<gpu>_<timestamp>/<pass>.pkl, the directory named after the run's
+CSV, ready to drop on pytorch.org/memory_viz. Fetch them by hand (after Ctrl+C or --detach) with:
+    modal volume get cs336-runs /a2/<name> assignment2-systems/results/<name>
+The timings such a run writes to the CSV and the log are not benchmarks: recording a stack
+trace for every allocation slows each pass down. Tell those rows apart by the flag in the
+log's command column.
+
 Default GPU is H100 (80 GB, about $4/h). A100-80GB is the cheaper 80 GB option (about
 $2.50/h). Anything with 24 GB (A10G, L4) fits at most the medium size.
 """
@@ -45,6 +55,8 @@ REMOTE_A2 = "/root/cs336/assignment2-systems"
 REMOTE_CSV = "/tmp/bench.csv"
 RUNS_MOUNT = "/runs"
 LOG = A2 / "results" / "bench_log.csv"
+# memory_snapshot in cs336_basics.nn_utils dumps <pass>.pkl into the bench script's cwd.
+SNAPSHOT_GLOB = "*.pkl"
 
 # Settings copied into the log, by their name in the bench script's argparse namespace.
 LOGGED_SETTINGS = (
@@ -76,6 +88,8 @@ IGNORE = [
     "cs336_systems/runs",
     "**/*.nsys-rep",
     "**/*.sqlite",
+    "**/*.pkl",  # so any .pkl in the container after a run came from that run
+    "**/*.pickle",
 ]
 
 # uv.lock pins cs336-basics as an editable install from ./cs336-basics, but Modal's uv_sync
@@ -91,9 +105,10 @@ image = (
 
 
 @app.function(image=image, gpu="H100", volumes={RUNS_MOUNT: runs_vol}, timeout=3600)
-def bench(flags: list[str], name: str) -> tuple[int, str, str, dict]:
+def bench(flags: list[str], name: str) -> tuple[int, str, str, dict, list[str]]:
     """Returns (exit code, the CSV text the bench script wrote, the exact command run, the
-    settings the script parsed from that command, or {} if parsing failed)."""
+    settings the script parsed from that command, or {} if parsing failed, and the file names of
+    the memory snapshots it dumped, which are on the volume under /a2/<name>/)."""
     argv = ["--device", "cuda", "--of_name", REMOTE_CSV, *flags]
     cmd = ["python", "-m", "cs336_systems.bench_script", *argv]
     command = " ".join(shlex.quote(c) for c in cmd)
@@ -106,17 +121,29 @@ def bench(flags: list[str], name: str) -> tuple[int, str, str, dict]:
         print(f"could not read the script's settings (log columns will be blank):\n{probe.stderr}", flush=True)
     csv_path = pathlib.Path(REMOTE_CSV)
     returncode = -1
+    snapshots: list[str] = []
     try:
         returncode = subprocess.run(cmd, cwd=REMOTE_A2, check=False).returncode
     finally:
         # Runs on Ctrl+C and on a crash too, so rows the script already wrote survive on the volume.
+        keep = pathlib.Path(RUNS_MOUNT) / "a2"
         if csv_path.exists():
-            keep = pathlib.Path(RUNS_MOUNT) / "a2" / f"{name}.csv"
-            keep.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(csv_path, keep)
-            runs_vol.commit()
+            keep.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(csv_path, keep / f"{name}.csv")
             print(f"\n{csv_path.read_text()}(also on volume cs336-runs at /a2/{name}.csv)", flush=True)
-    return returncode, csv_path.read_text() if csv_path.exists() else "", command, settings
+        # Snapshots dumped by --memory_profiling. IGNORE keeps .pkl out of the upload, so any
+        # here came from this run. memory_snapshot dumps in a finally, so a pass that died
+        # (OOM included) leaves a snapshot of the moment it died; a pass killed with the
+        # container may not.
+        for pkl in sorted(pathlib.Path(REMOTE_A2).glob(SNAPSHOT_GLOB)):
+            (keep / name).mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(pkl, keep / name / pkl.name)
+            snapshots.append(pkl.name)
+        if snapshots:
+            print(f"memory snapshots on volume cs336-runs at /a2/{name}/: {' '.join(snapshots)}", flush=True)
+        if csv_path.exists() or snapshots:
+            runs_vol.commit()
+    return returncode, csv_path.read_text() if csv_path.exists() else "", command, settings, snapshots
 
 
 def bench_rows(csv_text: str) -> list[tuple[str, str, str]]:
@@ -153,6 +180,16 @@ def append_log(log: pathlib.Path, base: dict[str, str], rows: list[tuple[str, st
     return len(lines)
 
 
+def fetch_snapshots(name: str, snapshots: list[str], dest: pathlib.Path) -> None:
+    """Download the run's memory snapshots from the volume (/a2/<name>/) into dest/."""
+    dest.mkdir(parents=True, exist_ok=True)
+    for snap in snapshots:
+        with (dest / snap).open("wb") as f:
+            for chunk in runs_vol.read_file(f"a2/{name}/{snap}"):
+                f.write(chunk)
+        print(f"wrote {dest / snap}")
+
+
 @app.local_entrypoint()
 def main(flags: str, gpu: str = "H100", out: str = "", timeout_hours: float = 1.0) -> None:
     flag_list = shlex.split(flags)
@@ -162,12 +199,16 @@ def main(flags: str, gpu: str = "H100", out: str = "", timeout_hours: float = 1.
     started = datetime.datetime.now()
     name = f"{gpu}_{started.strftime('%Y%m%d-%H%M%S')}"
     path = pathlib.Path(out) if out else A2 / "results" / f"{name}.csv"
+    snapshot_dir = path.with_suffix("")
     fn = bench.with_options(gpu=gpu, timeout=int(timeout_hours * 3600))
     try:
-        returncode, csv_text, command, settings = fn.remote(flag_list, name)
+        returncode, csv_text, command, settings, snapshots = fn.remote(flag_list, name)
     except KeyboardInterrupt:
         print(f"\ninterrupted; rows written before that are on the volume. Fetch with:\n"
               f"  modal volume get cs336-runs /a2/{name}.csv {path}")
+        if "--memory_profiling" in flag_list:
+            print(f"and the snapshots of the passes that finished with:\n"
+                  f"  modal volume get cs336-runs /a2/{name} {snapshot_dir}")
         raise
     if csv_text:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -175,6 +216,10 @@ def main(flags: str, gpu: str = "H100", out: str = "", timeout_hours: float = 1.
         print(f"\n{csv_text}wrote {path}")
     else:
         print("\nno CSV came back")
+    if snapshots:
+        fetch_snapshots(name, snapshots, snapshot_dir)
+    elif "--memory_profiling" in flag_list:
+        print("no memory snapshots came back")
     resolved = path.resolve()
     base = {
         "timestamp": started.isoformat(timespec="seconds"),

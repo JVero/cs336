@@ -317,13 +317,84 @@ All of the model sizes get major speedups using bfloat16, and the gains are simi
 ## memory_profiling
 
 Memory Profiling (4 points)
-What parts of layer normalization are sensitive to mixed precision?
+    # Start recording memory history.
+    torch.cuda.memory._record_memory_history(max_entries=1000000)
+    ... # what you want to profile in your benchmarking script
+    # Save a pickle file to be loaded by PyTorch's online tool.
+    torch.cuda.memory._dump_snapshot("memory_snapshot.pickle")
+    # Stop recording history.
+    torch.cuda.memory._record_memory_history(enabled=None)
+
+Running the forward pass and full step for 2048 xl, visualizing the allocations in xl_2048_fp32_forward.jpg and xl_2048_fp32_fullstep.jpg , you can see a pyramid shape forming for the activations with the peak occurring towards the end of `forward`. To the left of `fullstep` you can also see a short decline for the zero_grad() call. I ran all of the runs with batchsize 1, as XL with batchsize of 4 OOMed at full precision at context length 2048 so I wanted to evaluate all of the runs in the same context.
+
+B. Peak memory usage (256, 512, 1024 full steps given as a bonus) is given below. The first row for each context length is full precision, second is mixed precision.
+
+Context Length, Forward,    Full Step
+128  Full        14.0GiB,   51.2GiB
+     Mixed       19.8GiB,   57.6GiB
+256  Full                   51.2GiB
+     Mixed                  57.6GiB
+512  Full                   51.2GiB
+     Mixed                  57.6GiB
+1024 Full                   56.2GiB
+     Mixed                  57.6GiB
+2048 Full       64.1GiB,    90.9GiB
+     Mixed      54.9GiB,    82.5GiB
+
+
+C. This demonstrates the fixed cost of autocast / mixed precision that is "paid for" when the context length grows, which increases the activation size, as naive attention grows T^2 for a (B,T,C) input, and the residual and FFN activations grow linearly with T.
+
+D. Given the reference hyperparameters 
+    "xl": {
+            "d_model": 2560,
+            "d_ff": 10240,
+            "num_layers": 32,
+            "num_heads": 32
+    }, the size of the activations in the residual stream is (B, T, C) = (1, 1024, 2560) = 2,621,440 float32s = 10,485,760 bytes, so 10 MiB. In mixed precision, that count would be halved to 5 MiB.
+
+E: In fp32 at 1024 context length, when you reduce the allocations in the forward pass to only the largest ones, the unanimously largest allocations are 134217728 byte (128 MiB) allocations, which the trace says come from softmax. These are also the largest allocations in mixed precision. They also have the annoying property of persisting longer than most of the other allocations in this filter. The form the biggest sub-pyramid underneath these allocations.
+
+F:
+The tiny screenshot is under results/nsys_memory_screenshot. Its unreadableness is why I opted to parse through the sqlite file instead. Rather than the interpreting the screenshot of the memory allocation, I will post the percent of memory allocation for a block (this is block 6 but they are all equivalent)
+```josephvero@Mac assignment2-systems % uv run python ../scripts/nsys_alloc_pivot.py results/xl_1024_memory_h100/xl_1024_memory_h100.sqlite --block 6```
+block 6: 526.322 ms to 543.013 ms on the timeline ruler (from 'Self-attention' #6 to #7)
+in use at window start    2913.1 MiB
+in use at window end      3470.4 MiB   (growth 557.4 MiB)
+allocated in window       1199.5 MiB in 52 cudaMallocs
+still alive at end         557.4 MiB in 22 tensors
+op                         n       MiB  % of alive
+aten::exp                  1     128.0       23.0%
+aten::div                  1     128.0       23.0%
+aten::mul                  6     120.0       21.5%
+aten::bmm                  3      90.0       16.1%
+aten::sigmoid              1      40.0        7.2%
+
+The top 5 contributions are exp, div, mul (element-wise multiplication), batched matmul, and calculating sigmoid. These 5 operations take 90.8% of the memory allocation of each block.
+
+For backwards, when running `uv run python ../scripts/nsys_alloc_pivot.py results/xl_1024_memory_h100/xl_1024_memory_h100.sqlite --range SigmoidBackward0 --block 4`,  (all blocks have equivalent values)
+
+block 4: 1250.106 ms to 1293.621 ms on the timeline ruler (from 'SigmoidBackward0' #4 to #5)
+in use at window start   17833.2 MiB
+in use at window end     17675.8 MiB   (change -157.4 MiB)
+allocated in window       2878.3 MiB in 92 cudaMallocs
+freed in window            647.4 MiB allocated before the window, 2388.3 MiB allocated inside it
+still alive at end         490.0 MiB in 12 tensors
+
+op                         n       MiB  % of alive
+aten::empty_strided        7     400.0       81.6%
+aten::mul                  2      80.0       16.3%
+aten::bmm                  1      10.0        2.0%
+aten::sum                  2       0.0        0.0%
+
+Backwards shrinks total memory usage by 157.4MiB per layer when calculating backward. It roughly matches my expectation because the slope after the peak is more shallow than before the peak (forward allocates more memory than backward). This net comes from the calculation of X - 557.4 MiB = - 157.4, implying that 400MiB of tensors were allocated and not freed within this block. 400MiB in a backwards step would match up if each layer had 400MiB of parameters. 400MiB = 419,430,400 bytes, and if the gradients are stored as float32, then 400MiB would correspond to 104,857,600 floats per layer.
+Calculating the number of parameters
+4 · 2560²        =  26,214,400 <- Wq, Wk, Wv, Wo
+3 · 2560 · 10240 =  78,643,200 <- 3x FFN which are either d_model x d_ffn parameters
+total            = 104,857,600 floats = 400 MiB
+These match up exactly, and the 7 weight matrices aligns perfectly with the 7 calls to aten::empty_strided.
 
 ## gradient_checkpointing
-
 Memory-Optimal Gradient Checkpointing (4 points)
-
-
 ## torch_compile
 
 Torch Compile (2 points)

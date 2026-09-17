@@ -9,7 +9,7 @@ import torch
 
 from cs336_basics.model import BasicsTransformerLM
 from cs336_basics.data import get_batch
-from cs336_basics.nn_utils import cross_entropy, ctx_range
+from cs336_basics.nn_utils import cross_entropy, ctx_range, memory_snapshot
 from cs336_basics.optimizer import AdamW
 
 model_parser = argparse.ArgumentParser()
@@ -70,7 +70,15 @@ params_group.add_argument("--d_model", type=int)
 params_group.add_argument("--num_layers", type=int)
 params_group.add_argument("--num_heads", type=int)
 params_group.add_argument("--d_ff", type=int)
-params_group.add_argument("--rope_theta", type=int, default=10_000)
+params_group.add_argument("--rope_theta", type=int, default=10
+
+
+
+
+
+                          _000)
+
+                          asdfasdfasdf
 # params_group.add_argument("--dtype", type=str, choices=valid_types.keys(), default='f32')
 params_group.add_argument("--device", type=str, choices=available_devices, required=True)
 
@@ -85,6 +93,7 @@ bench_parser.add_argument("--full_step", action="store_true")
 bench_parser.add_argument("--warmup_steps", type=int, default=5)
 bench_parser.add_argument("--model",  help="The max size the run will go until", choices=list(configs.keys()), required=True)
 bench_parser.add_argument("--mixed_precision", action="store_true")
+bench_parser.add_argument("--memory_profiling", action="store_true")
 
 bench_parser.add_argument("--of_name", required=True)
 
@@ -182,20 +191,22 @@ def run_profile(label: str, overridden_args: dict, model_args, bench_args):
         bench_args.full_step = None
     print(f"Number of steps: {bench_args.num_steps}")
     results = []
+    if device != "cuda":
+        bench_args.memory_profiling = False # No memory profiling without cuda
     with ctx_range("Measurement"):
         if bench_args.forward:
             print("Running forward...")
-            with cm:
+            with cm,  (memory_snapshot("forward.pkl", clean_cache=True) if bench_args.memory_profiling else nullcontext()):
                 result = timeit.repeat(f, number=bench_args.num_steps, repeat=bench_args.num_repeats)
             results.extend([f(result) for f in [np.mean, np.std]])
         if bench_args.forward_and_back:
             print("Running forward and backward...")
-            with cm:
+            with cm,  (memory_snapshot("forward_and_back.pkl", clean_cache=True) if bench_args.memory_profiling else nullcontext()):
                 result = timeit.repeat(fandb, number=bench_args.num_steps, repeat=bench_args.num_repeats)
             results.extend([f(result) for f in [np.mean, np.std]])
         if bench_args.full_step:
             print("Running full training step...")
-            with cm:
+            with cm,  (memory_snapshot("full_step.pkl", clean_cache=True) if bench_args.memory_profiling else nullcontext()):
                 result = timeit.repeat(fstep, number=bench_args.num_steps, repeat=bench_args.num_repeats)
             results.extend([f(result) for f in [np.mean, np.std]])
     with open(bench_args.of_name, "a") as fo:
@@ -205,6 +216,10 @@ def run_profile(label: str, overridden_args: dict, model_args, bench_args):
 if __name__ == "__main__":
     model_args, rest = model_parser.parse_known_args()
     bench_args = bench_parser.parse_args(rest)
+    if bench_args.memory_profiling:
+        if sum([t for t in [bench_args.forward, bench_args.forward_and_back, bench_args.full_step] if t]) != 1:
+            bench_parser.error("When --memory_profiling is enabled, only 1 test is allowed at a time")
+            
     tests_to_run = []
     if bench_args.forward:
         tests_to_run.extend(["forward" + " " + s for s in ["mean", "std"]])
