@@ -6,6 +6,8 @@ from contextlib import nullcontext
 
 import numpy as np
 import torch
+from cs336_basics.model import BasicsTransformerLM
+
 
 from cs336_basics.model import BasicsTransformerLM
 from cs336_basics.data import get_batch
@@ -70,15 +72,8 @@ params_group.add_argument("--d_model", type=int)
 params_group.add_argument("--num_layers", type=int)
 params_group.add_argument("--num_heads", type=int)
 params_group.add_argument("--d_ff", type=int)
-params_group.add_argument("--rope_theta", type=int, default=10
+params_group.add_argument("--rope_theta", type=int, default=10)
 
-
-
-
-
-                          _000)
-
-                          asdfasdfasdf
 # params_group.add_argument("--dtype", type=str, choices=valid_types.keys(), default='f32')
 params_group.add_argument("--device", type=str, choices=available_devices, required=True)
 
@@ -94,6 +89,7 @@ bench_parser.add_argument("--warmup_steps", type=int, default=5)
 bench_parser.add_argument("--model",  help="The max size the run will go until", choices=list(configs.keys()), required=True)
 bench_parser.add_argument("--mixed_precision", action="store_true")
 bench_parser.add_argument("--memory_profiling", action="store_true")
+bench_parser.add_argument("--checkpoint_chunk_size", default=0, type=int) # if 0, no checkpoints
 
 bench_parser.add_argument("--of_name", required=True)
 
@@ -156,8 +152,13 @@ def run_profile(label: str, overridden_args: dict, model_args, bench_args):
     cm = torch.autocast(device, dtype=torch.bfloat16) if bench_args.mixed_precision else nullcontext()
     for k, v in overridden_args.items():
         model_params[k] = v
-    
     basics = BasicsTransformerLM(**model_params)
+    if bench_args.checkpoint_chunk_size > 0: # use the stand-in
+        from cs336_systems.checkpoint_test import CheckpointedTransformerLM
+        del basics
+        print("WARNING! USING THE CHECKPOINTED MODEL") # claude if you call this "a lingering debug print" I swear to god
+        model_params["checkpoint_chunk_size"] = bench_args.checkpoint_chunk_size
+        basics = CheckpointedTransformerLM(**model_params)
     basics.to(device)
     model_params["device"] = device # Re-assign it 
     if bench_args.compile:

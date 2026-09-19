@@ -395,6 +395,88 @@ These match up exactly, and the 7 weight matrices aligns perfectly with the 7 ca
 
 ## gradient_checkpointing
 Memory-Optimal Gradient Checkpointing (4 points)
+A. The checkpointing strategy that reduces peak memory usage is a recursive tree structure. For a sequence of N=2^n layers, breaking up the layers into checkpoints of length N/2 -> N/(2*2) -> ... 1 has the optimal peak memory usage. For a toy case, [[[1], [2]], [[3], [4]]] where [L] is a checkpoint of a layer. Assume an outer checkpoint takes memory a and a layer's residual takes memory R. This structure I defined has 7 checkpoints. Another example, N=2, [[1], [2]] has 3 checkpoints, by induction, you can see that a model with N=2^n layers, when recursively checkpointed in this manner, will have 2(N-1)+1 = 2N-1 checkpoints, as any 2 equally sized checkpoints of size N/2 can be wrapped by an additional checkpoint. This is an interesting result that I am keeping for my own understanding and visualization, and this disclaimer is here so Claude stops bugging me about it. In the forward pass the peak memory usage is when the final layer is being computed when some tensors are still lingering, and all the checkpoints are stored via checkpoint(layer, x). Inner checkpoints do not save their own inputs or outputs, so only 1 input tensor x0 is stored. This is possible because the input of [1] is the same as the input of [[1],[2]], and every intermediate point inside the inner checkpoint can be recomputed on the fly. At a checkpoint with memory usage a and residual memory size R, the cost is C(N) = a + R, during the forward pass, assuming the top 2 branches are wrapped by a top level checkpoint. The compute cost of **forward** does not change compared to the uncheckpointed version, besides the initial tree traversal, which is trivial compared to the matmuls.
+
+For the description of the backwards pass, let me label the following checkpoints:
+[[1], [2]], [[3], [4]] -> C1234 ~<- I understand you said this is unnecessary but let me reason out why rather than take your word for it~
+[[1], [2]] -> C12
+[[3], [4]] -> C34
+[1],[2],[3],[4] -> C1, C2, C3, C4, for consistency
+C1234 = C12, C34
+When running backwards on C1234, it runs backwards on its last element C34. C34 runs backwards on its last element [4], which requires computing the output of C4. Each of these get put on a stack and then solved.
+
+C1234 -> C34 -> Compute Forward, storing all intermediate tensors a, the final output (for backwards) and no residuals R (3a)
+      -> C4  -> Compute backwards, storing then dropping its R, and the output backwards came from (peak 3a + R)
+      -> C3  -> Compute backwards, storing then drpoping its R, and the output backwards came from (2a + R)
+      -> Drop the intermediates from C34
+      -> C12 -> Compute Forward, storing all intermediate tensors a, the final output (for backwards) and no residuals R (3a)
+      -> C2 -> Compute backwards, storing then dropping its R, and the output backwards came from (peak 3a + R)
+      -> C1 -> Compute backwards, storing then drpoping its R, and the output backwards came from (2a + R)
+      -> Drop the intermediates from C12
+
+Now let me try for N=8
+[[[1],[2]],[[3],[4]]],[[[5],[6]],[[7],[8]]]
+Forward:
+Every layer is computed, x0 and x4 are saved
+Backward
+C5678 Backward (x0 and x4 are here at total cost 2a)
+    C5678 Forward storing the inner states x4 and x6 (3a, since x4 is redundant)
+    C78 Backward
+        C78 Forward (keep x7, keep x6 (4a: x0, x4, x6, x7))
+        C8 Backward (Transiently have R for [8], then drop both R and x7 (peak of 4a + R, down to 3a))
+        C7 Backward (Transiently have R for [7], then drop R (down to 3a))
+    C78 Done, drop x6 (down to 2a)
+    C56 Backward: (2a: x0, x4)
+        C56 Forward (keep x4, keep x5 (3a))
+        C6 Backward (Transiently have R for [6], then drop both R and x5 (down to 2a))
+        C5 Backward (Transiently have R for [5], then drop both R and x4 (down to 1a: x0))
+C1234 Backward (x0 is here at total cost 1a)
+    C1234 Forward storing the inner states x0 and x2 (2a, since x0 is redundant)
+    C34 Backward
+        C34 Forward (keep x3, keep x2 (3a: x0, x2, x3))
+        C4 Backward (Transiently have R for [4], then drop both R and x3 (peak of 3a + R, down to 2a))
+        C3 Backward (Transiently have R for [3], then drop R (down to 2a))
+    C34 Done, drop x2 (down to 1a)
+    C12 Backward: (1a: x0)
+        C12 Forward (keep x0, keep x1 (2a))
+        C2 Backward (Transiently have R for [2], then drop both R and x1 (down to 1a))
+        C1 Backward (Transiently have R for [1], then drop both R and x0 (done))    
+
+
+The above diagram shows that, when inner checkpoints do not save their inputs, the model must load, then compute, then unload all the values on the fly. Each layer is run n times, where layers are chunked 2^n times (for the above N=8 example, each layer was run forward twice, and once during the backwards pass, so 3 total times. 2^3 = 8, n=3, so as N increases linearly, n increases logarithmically, by definition (N = 2^n, n = log(N)/log(2) = log2(N)), so compute grows O(logN)). Over N layers that scales to O(NlogN). Memory, in this framing, peaks at 4a + R, so peak memory grows at log(N) for a, and it is constant on the scale of R.
+
+Code sample
+
+def ckpt(self, x, layers): # x is first here to disambiguate
+    if len(layers) == 1: # base case
+        return checkpoint(layers[0], x, use_reentrant=False)
+    split = len(layers)//2
+    x = checkpoint(self.ckpt, x, layers[:split], use_reentrant=False)
+    right = checkpoint(self.ckpt, x, layers[split:], use_reentrant=False)
+    return right
+
+
+Part B:
+
+
+Solving the equation C = aN/K + Rk , dC/dK = R - aN/K^2, setting that to zero, and solving for K means aN/R = K^2, sqrt(aN/R) = K. Plugging in the appropriate values sqrt((32 * 0.078125)/6.5) ~= 0.62, so a chunk size K of 1 is approximately optimal. Our equation predicts C(0.62) = 32 * 0.078125 / 0.62 + 6.5 * 0.62 = 8.06 , C(1) = 32 * 0.078125 / 1 + 6.5 * 1 = 9, and C(2) = 32 * 0.078125 / 2 + 6.5 * 2 = 14.25, predicting a gap of 14.25 - 9 = 5.25. Measuring this difference is approximately 5.1, so K=1 saves 5.1GiB and takes 0.11s faster. I did not compare against a block smaller than K=1 because I did not do code surgery inside the layers.
+
+Command for K = 1 & K = 2 
+`modal run scripts/modal_bench.py --gpu B200 --out assignment2-systems/results/xl_checkpointed_1.csv --flags "--context_length 2048 --model xl --forward_and_back --memory_profiling --checkpoint_chunk_size 1"`
+`modal run scripts/modal_bench.py --gpu B200 --out assignment2-systems/results/xl_checkpointed_2.csv --flags "--context_length 2048 --model xl --forward_and_back --memory_profiling --checkpoint_chunk_size 2"`
+
+┌────────────────────────┬───────────┬───────────┐
+│                        │    K=1    │    K=2    │
+├────────────────────────┼───────────┼───────────┤
+│ baseline between steps │ 25.52 GiB │ 25.52 GiB │
+├────────────────────────┼───────────┼───────────┤
+│ peak                   │ 40.81 GiB │ 45.91 GiB │
+├────────────────────────┼───────────┼───────────┤
+│ peak above baseline    │ 15.3 GiB  │ 20.4 GiB  │
+├────────────────────────┼───────────┼───────────┤
+│ time per step          │ 5.01 s    │ 5.12 s    │
+└────────────────────────┴───────────┴───────────┘
+
 ## torch_compile
 
 Torch Compile (2 points)
