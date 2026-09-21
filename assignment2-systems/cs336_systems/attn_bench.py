@@ -18,6 +18,7 @@ parser.add_argument("--device", default="mps")
 parser.add_argument("--out", default="attn_times.csv")
 parser.add_argument("--warmup", default=5, type=int)
 parser.add_argument("--num_iters", default=100, type=int)
+parser.add_argument("--compile", action="store_true")
 class BasicAttn(nn.Module):
     """Multi-Head Self-Attention
 
@@ -73,6 +74,10 @@ class BasicAttn(nn.Module):
         
         return attn_output
 
+def setup(model, Q, K, V):
+    box.update(y = model(Q, K, V).sum())
+    sync()
+
 def sync(device=None):
     torch.accelerator.synchronize()
 
@@ -81,11 +86,10 @@ def fw(Q, K, V, model, device):
     model(Q,K,V)
     sync(device=device)
     
-def bw(y: torch.Tensor, device):
+def bw(device):
     ### Mostly a no-op, but harmless
     sync(device=device)
-    # retain_graph so 1. I'm only timing the backward pass, not the freeing, and 2. I don't need to re-allocate y every time
-    y.backward(retain_graph=True)
+    box["y"].backward()
     sync(device=device)  
 
 if __name__ == "__main__":
@@ -96,7 +100,14 @@ if __name__ == "__main__":
         for seq_len in (seqs:=[256, 1024, 4096, 8192, 16384]):
             Q, K, V = [torch.randn((batch_size, seq_len, d_model), device=args.device, requires_grad=True) for _ in range(3)]
             model = BasicAttn(d_model).to(args.device)
+            if args.compile:
+                model.compile()
+            box = {}
+            setup_fn = lambda: setup(model, Q, K, V)
             forward = lambda: fw(Q, K, V, model, args.device)
+            with open(args.out, "a+") as f:
+                f.write("==========================")
+                f.write(f"{batch_size=}, {seq_len=}, {d_model=}\n")
             try:
                 ### Forward warmup
                 for _ in range(args.warmup):
@@ -114,27 +125,22 @@ if __name__ == "__main__":
                 print(torch.cuda.memory_allocated())
                 with open(args.out, "a+") as f:
                     f.write("Memory after attention: " + str(torch.cuda.memory_allocated()) + "\n")
-                    f.write("\n")
             
             try:
-                ### Dummy backward variable
-                y = model(Q, K, V).sum()
-                with open(args.out, "a+") as f:
-                    f.write("Memory after y allocated: " + str(torch.cuda.memory_allocated()) +"\n")
-                    f.write("\n")
-                backward = lambda: bw(y, args.device)
+                backward = lambda: bw(args.device)
                 ### Backward warmup
                 for _ in range(args.warmup):
+                    setup_fn()
                     backward()    
                 with open(args.out, "a+") as f:
                     f.write("Memory after warmup: " + str(torch.cuda.memory_allocated()) + "\n")
                 ### Backward benchmarking
-                result = timeit.repeat(backward, repeat=args.num_iters, number=1)
+                result = timeit.repeat(backward, repeat=args.num_iters, number=1, setup=setup_fn)
                 with open(args.out, "a+") as f:
                     f.write(f"Backward: {d_model=}, {seq_len=}, {np.mean(result)}\n")
 
                 results.append(np.mean(result))
-                y = None
+                box["y"] = None
                 with open(args.out, "a+") as f:
                     f.write("Memory after backward profile: " + str(torch.cuda.memory_allocated()) + "\n")
             except torch.cuda.OutOfMemoryError:
