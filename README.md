@@ -90,7 +90,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `memory_profiling` Memory Profiling (4 pts)
 - [x] `gradient_checkpointing` Memory-Optimal Gradient Checkpointing (4 pts)
 - [x] `pytorch_attention` PyTorch Attention Benchmarking (2 pts)
-- [ ] `torch_compile` Torch Compile (2 pts)
+- [x] `torch_compile` Torch Compile (2 pts)
 - [ ] `flash_forward` FlashAttention-2 Forward Pass (15 pts)
 - [ ] `flash_backward` FlashAttention-2 Backward Pass (5 pts)
 - [ ] `flash_benchmarking` FlashAttention-2 Benchmarking (5 pts)

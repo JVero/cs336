@@ -159,3 +159,64 @@ Memory after y allocated: 0
 Memory after warmup: 0
 Backward: d_model=128, seq_len=4096, 0.091758470700006
 Memory after backward profile: 0
+Forward: d_model=16, seq_len=256, 0.00042093171941814944
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=256, 0.0005906738204066642
+Memory after backward profile: 0
+Forward: d_model=16, seq_len=1024, 0.0037454891609377226
+Memory after y allocated: 0
+
+Forward: d_model=16, seq_len=256, 0.0003951887707808055
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=256, 0.000558156659535598
+Memory after backward profile: 0
+Forward: d_model=16, seq_len=1024, 0.003749960489803925
+Memory after y allocated: 0
+
+Forward: d_model=16, seq_len=256, 0.00040835751889972016
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=256, 0.0005788949795532971
+Memory after backward profile: 0
+Forward: d_model=16, seq_len=1024, 0.0037366587514407
+Memory after y allocated: 0
+
+Forward: d_model=16, seq_len=256, 0.00041383955045603215
+Memory after y allocated: 0
+
+Forward: d_model=16, seq_len=256, 0.00041742667206563056
+Memory after y allocated: 0
+
+Forward: d_model=16, seq_len=256, 0.00041641210089437663
+Memory after y allocated: 0
+
+Forward: d_model=16, seq_len=256, 0.00041926532023353505
+Memory after y allocated: 0
+
+Forward: d_model=16, seq_len=256, 0.00044834161119069907
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=256, 0.0005740095692453906
+Memory after backward profile: 0
+Forward: d_model=16, seq_len=1024, 0.003763215837534517
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=1024, 0.0045900108499336055
+Memory after backward profile: 0
+Forward: d_model=16, seq_len=4096, 0.05705912912904751
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=4096, 0.07196740536077413
+Memory after backward profile: 0
+Forward: d_model=16, seq_len=8192, 0.2361684924783185
+Memory after y allocated: 0
+
+Memory after warmup: 0

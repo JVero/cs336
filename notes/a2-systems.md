@@ -523,7 +523,7 @@ Memory Accounting, using the 3 major lines in the benchmark script
             - softmax(X)
                 rescaled_input = x - torch.max(x, dim=dim, keepdim=True)[0] <- this operation's gradient doensn't depend on x, so its values aren't saved
                 exponentiated_rescaled_input = torch.exp(rescaled_input) -> (B, T, T) = 8,192 MiB
-                return exponentiated_rescaled_input / torch.sum(exponentiated_rescaled_input, dim=dim, keepdim=True) -> In-place, this allocates new memory for the bottom value <- allocate a single float32 (4 bytes, trivial)
+                return exponentiated_rescaled_input / torch.sum(exponentiated_rescaled_input, dim=dim, keepdim=True) -> This allocates new memory for the bottom value <- allocate a single float32 (4 bytes, trivial)
                 exponentiated_rescaled_input / torch.sum(exponentiated_rescaled_input, dim=dim, keepdim=True) <- This result allocates 8,192 MiB
             - softmax( _ ) @ V
                 (B, T, T) @ (B, T, C) = (B, T, C)
@@ -543,7 +543,62 @@ Memory Accounting, using the 3 major lines in the benchmark script
 ## torch_compile
 
 Torch Compile (2 points)
+a. # Attention: eager vs torch.compile, B200
 
+Eager: `attn_B200_20260921-163144_nocompile.txt` (`python -m cs336_systems.attn_bench --device cuda --out /tmp/attn.txt`)
+
+Compiled: `attn_B200_20260921-163417_compile.txt` (`python -m cs336_systems.attn_bench --device cuda --out /tmp/attn.txt --compile`)
+
+Times in ms, mean of 100 passes, batch 8. Speedup = eager / compiled.
+
+| d_model | seq_len | fwd eager | fwd compiled | fwd speedup | bwd eager | bwd compiled | bwd speedup |
+|--:|--:|--:|--:|--:|--:|--:|--:|
+| 16 | 256 | 0.234 | 0.134 | 1.75x | 0.468 | 0.244 | 1.92x |
+| 16 | 1024 | 0.245 | 0.197 | 1.24x | 0.513 | 0.348 | 1.47x |
+| 16 | 4096 | 2.36 | 1.95 | 1.21x | 4.55 | 2.82 | 1.61x |
+| 16 | 8192 | 9.44 | 7.50 | 1.26x | 17.3 | 10.9 | 1.59x |
+| 16 | 16384 | 36.2 | 29.2 | 1.24x | 66.5 | 40.4 | 1.65x |
+| 32 | 256 | 0.235 | 0.166 | 1.41x | 0.480 | 0.242 | 1.98x |
+| 32 | 1024 | 0.257 | 0.244 | 1.06x | 0.496 | 0.361 | 1.38x |
+| 32 | 4096 | 2.45 | 2.20 | 1.11x | 4.63 | 2.92 | 1.58x |
+| 32 | 8192 | 9.80 | 8.15 | 1.20x | 17.6 | 10.8 | 1.63x |
+| 32 | 16384 | 37.7 | 30.8 | 1.23x | 68.0 | 42.0 | 1.62x |
+| 64 | 256 | 0.228 | 0.163 | 1.40x | 0.475 | 0.239 | 1.99x |
+| 64 | 1024 | 0.272 | 0.265 | 1.02x | 0.522 | 0.393 | 1.33x |
+| 64 | 4096 | 2.77 | 2.52 | 1.10x | 5.22 | 3.53 | 1.48x |
+| 64 | 8192 | 11.0 | 9.37 | 1.17x | 19.8 | 13.1 | 1.52x |
+| 64 | 16384 | 42.8 | 35.8 | 1.19x | 78.0 | 51.8 | 1.51x |
+| 128 | 256 | 0.214 | 0.166 | 1.29x | 0.480 | 0.265 | 1.81x |
+| 128 | 1024 | 0.307 | 0.302 | 1.02x | 0.621 | 0.470 | 1.32x |
+| 128 | 4096 | 3.33 | 3.06 | 1.08x | 6.36 | 4.64 | 1.37x |
+| 128 | 8192 | 13.3 | 11.7 | 1.14x | 24.7 | 17.9 | 1.38x |
+| 128 | 16384 | 51.3 | 39.4 | 1.30x | 94.6 | 62.6 | 1.51x |
+
+modal run scripts/modal_bench.py --gpu B200 --out assignment2-systems/results/compiled_small_1024.csv --flags "--context_length 1024 --model small --forward --forward_and_back --full_step --compile --warmup_steps 10"
+
+modal run scripts/modal_bench.py --gpu B200 --out assignment2-systems/results/vanilla_small_1024.csv --flags "--context_length 1024 --model small --forward --forward_and_back --full_step --warmup_steps 10"
+
+modal run scripts/modal_bench.py --gpu B200 --out assignment2-systems/results/compiled_medium_1024.csv --flags "--context_length 1024 --model medium --forward --forward_and_back --full_step --compile --warmup_steps 10"
+
+modal run scripts/modal_bench.py --gpu B200 --out assignment2-systems/results/vanilla_medium_1024.csv --flags "--context_length 1024 --model medium --forward --forward_and_back --full_step --warmup_steps 10"
+
+modal run scripts/modal_bench.py --gpu B200 --out assignment2-systems/results/vanilla_xl_1024.csv --flags "--context_length 1024 --model xl --forward --forward_and_back --full_step --warmup_steps 10"
+
+modal run scripts/modal_bench.py --gpu B200 --out assignment2-systems/results/compiled_xl_1024.csv --flags "--compile --context_length 1024 --model xl --forward --forward_and_back --full_step --warmup_steps 10"
+
+| model | pass | vanilla (ms) | compiled (ms) | speedup |
+|---|---|--:|--:|--:|
+| small  | forward            | 37.32 ± 0.03  | 27.96 ± 0.06  | 1.33x |
+| small  | forward + backward | 108.12 ± 0.21 | 80.01 ± 0.21  | 1.35x |
+| small  | full step          | 116.72 ± 3.11 | 87.77 ± 0.17  | 1.33x |
+| medium | forward            | 106.09 ± 0.26 | 79.92 ± 0.51  | 1.33x |
+| medium | forward + backward | 306.94 ± 0.96 | 233.83 ± 0.17 | 1.31x |
+| medium | full step          | 325.87 ± 1.67 | 250.04 ± 0.24 | 1.30x |
+| xl     | forward            | 586.95 ± 1.04 | 521.89 ± 0.73 | 1.12x |
+| xl     | forward + backward | 1736.65 ± 0.58 | 1546.79 ± 0.72 | 1.12x |
+| xl     | full step          | 1816.31 ± 1.46 | 1625.71 ± 0.45 | 1.12x |
+
+The performance of foreward, foreward + backward, and full step all speedup by approximately a constant factor which is consistent *within* model size but decreases as the model size increases.
 
 ## flash_forward
 
