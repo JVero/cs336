@@ -1,0 +1,161 @@
+Forward: d_model=16, seq_len=256, 0.0006624498942983337
+Forward: d_model=16, seq_len=256, 0.0010206752034719103
+Forward: d_model=16, seq_len=256, 0.0012691163996350952
+Forward: d_model=16, seq_len=1024, 0.002965387397853192
+Forward: d_model=16, seq_len=1024, 0.005734912498155609
+Forward: d_model=32, seq_len=256, 0.0007370752020506189
+Forward: d_model=32, seq_len=256, 0.0018460123013937847
+Forward: d_model=32, seq_len=1024, 0.0031435250013601033
+Forward: d_model=32, seq_len=1024, 0.006748187601624522
+Forward: d_model=64, seq_len=256, 0.0007377084999461659
+Forward: d_model=64, seq_len=256, 0.0019897416001185774
+Forward: d_model=64, seq_len=1024, 0.0030024042003788053
+Forward: d_model=64, seq_len=1024, 0.00625845830218168
+Forward: d_model=128, seq_len=256, 0.0008700040954863653
+Forward: d_model=128, seq_len=256, 0.001877525099553168
+Forward: d_model=128, seq_len=1024, 0.0032347082960768603
+Forward: d_model=128, seq_len=1024, 0.00703877089836169
+Forward: d_model=16, seq_len=256, 0.0010340874985558912
+Forward: d_model=16, seq_len=256, 0.0012303999974392354
+Forward: d_model=16, seq_len=1024, 0.0028600666060810908
+Forward: d_model=16, seq_len=1024, 0.00588179579935968
+Forward: d_model=32, seq_len=256, 0.0005755915000918322
+Forward: d_model=32, seq_len=256, 0.0014146251036436298
+Forward: d_model=32, seq_len=1024, 0.002878283399331849
+Forward: d_model=32, seq_len=1024, 0.005992225196678191
+Forward: d_model=64, seq_len=256, 0.0005984999006614089
+Forward: d_model=64, seq_len=256, 0.0014333666025777348
+Forward: d_model=64, seq_len=1024, 0.002966466703219339
+Forward: d_model=64, seq_len=1024, 0.0062078041984932495
+Forward: d_model=128, seq_len=256, 0.0005990584017126821
+Forward: d_model=128, seq_len=256, 0.0015197998989606276
+Forward: d_model=128, seq_len=1024, 0.0032452208033646457
+Forward: d_model=128, seq_len=1024, 0.007150412401824724
+Forward: d_model=16, seq_len=256, 0.0010565499949734658
+Forward: d_model=16, seq_len=256, 0.0014248333987779914
+Forward: d_model=16, seq_len=1024, 0.0029403873981209473
+Forward: d_model=16, seq_len=1024, 0.0060265331994742155
+Forward: d_model=32, seq_len=256, 0.0005950209015281871
+Forward: d_model=32, seq_len=256, 0.0014776876021642237
+Forward: d_model=32, seq_len=1024, 0.0028970583007321693
+Forward: d_model=32, seq_len=1024, 0.006063128997629974
+Forward: d_model=64, seq_len=256, 0.0006659248974756338
+Forward: d_model=64, seq_len=256, 0.0013782876994810067
+Forward: d_model=64, seq_len=1024, 0.002959574802662246
+Forward: d_model=64, seq_len=1024, 0.006303941601072438
+Forward: d_model=128, seq_len=256, 0.0006181627002661116
+Forward: d_model=128, seq_len=256, 0.001514870898972731
+Forward: d_model=128, seq_len=1024, 0.0032359085031202993
+Forward: d_model=128, seq_len=1024, 0.007275250101520215
+Forward: d_model=16, seq_len=256, 0.0011781084991525858
+Forward: d_model=16, seq_len=256, 0.0016978792045847513
+Forward: d_model=16, seq_len=1024, 0.003105683598550968
+Forward: d_model=16, seq_len=1024, 0.006082925002556294
+Forward: d_model=32, seq_len=256, 0.0006278123968513682
+Forward: d_model=32, seq_len=256, 0.0014281040013884195
+Forward: d_model=32, seq_len=1024, 0.0028921000979607926
+Forward: d_model=32, seq_len=1024, 0.005953362498257775
+Forward: d_model=64, seq_len=256, 0.00059797509748023
+Forward: d_model=64, seq_len=256, 0.0015266623988281936
+Forward: d_model=64, seq_len=1024, 0.003002104097686242
+Forward: d_model=64, seq_len=1024, 0.006233537600201089
+Forward: d_model=128, seq_len=256, 0.0006219414979568682
+Forward: d_model=128, seq_len=256, 0.0014774622992263175
+Forward: d_model=128, seq_len=1024, 0.0032309457994415423
+Forward: d_model=128, seq_len=1024, 0.007026441699417773
+Forward: d_model=16, seq_len=256, 0.0010428875975776464
+Forward: d_model=16, seq_len=256, 0.0013611541988211683
+Forward: d_model=16, seq_len=1024, 0.002993712500028778
+Forward: d_model=16, seq_len=1024, 0.006091679098608438
+Forward: d_model=16, seq_len=4096, 0.043272658197383865
+Forward: d_model=16, seq_len=4096, 0.08431090830272296
+Forward: d_model=32, seq_len=256, 0.0005824001011205838
+Forward: d_model=32, seq_len=256, 0.0014353542021126487
+Forward: d_model=32, seq_len=1024, 0.0029062457993859424
+Forward: d_model=32, seq_len=1024, 0.0059457252034917476
+Forward: d_model=32, seq_len=4096, 0.041876183402200694
+Forward: d_model=32, seq_len=4096, 0.08177576669841073
+Forward: d_model=64, seq_len=256, 0.0005945833006990142
+Forward: d_model=64, seq_len=256, 0.0015342707018135115
+Forward: d_model=64, seq_len=1024, 0.003019099998346064
+Forward: d_model=64, seq_len=1024, 0.006256829402991571
+Forward: d_model=64, seq_len=4096, 0.04319625400094083
+Forward: d_model=64, seq_len=4096, 0.08465761269908398
+Forward: d_model=128, seq_len=256, 0.0006137667005532421
+Forward: d_model=128, seq_len=256, 0.0015686330996686592
+Forward: d_model=128, seq_len=1024, 0.0032691165994037873
+Forward: d_model=128, seq_len=1024, 0.007333958396338857
+Forward: d_model=128, seq_len=4096, 0.046674016701581424
+Forward: d_model=128, seq_len=4096, 0.09374147910275496
+Forward: d_model=16, seq_len=256, 0.0009631877008359879
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=256, 0.0010814332970767282
+Memory after backward profile: 0
+Forward: d_model=16, seq_len=1024, 0.0029432584007736294
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=1024, 0.005206941801588982
+Memory after backward profile: 0
+Forward: d_model=16, seq_len=4096, 0.04320483759511262
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=16, seq_len=4096, 0.08380956659821096
+Memory after backward profile: 0
+Forward: d_model=32, seq_len=256, 0.0005728083982830867
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=32, seq_len=256, 0.0008304291957756504
+Memory after backward profile: 0
+Forward: d_model=32, seq_len=1024, 0.0029120623017661273
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=32, seq_len=1024, 0.005403658296563663
+Memory after backward profile: 0
+Forward: d_model=32, seq_len=4096, 0.04195359580044169
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=32, seq_len=4096, 0.08115891670167912
+Memory after backward profile: 0
+Forward: d_model=64, seq_len=256, 0.0005993874015985057
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=64, seq_len=256, 0.0008626873983303085
+Memory after backward profile: 0
+Forward: d_model=64, seq_len=1024, 0.0030474498969851995
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=64, seq_len=1024, 0.005642970898770727
+Memory after backward profile: 0
+Forward: d_model=64, seq_len=4096, 0.043329445898416453
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=64, seq_len=4096, 0.08360852090117987
+Memory after backward profile: 0
+Forward: d_model=128, seq_len=256, 0.0005952834020718001
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=128, seq_len=256, 0.0009238709986675531
+Memory after backward profile: 0
+Forward: d_model=128, seq_len=1024, 0.0032828332972712816
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=128, seq_len=1024, 0.006305495798005723
+Memory after backward profile: 0
+Forward: d_model=128, seq_len=4096, 0.04679819569864776
+Memory after y allocated: 0
+
+Memory after warmup: 0
+Backward: d_model=128, seq_len=4096, 0.091758470700006
+Memory after backward profile: 0

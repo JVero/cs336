@@ -477,6 +477,69 @@ Command for K = 1 & K = 2
 │ time per step          │ 5.01 s    │ 5.12 s    │
 └────────────────────────┴───────────┴───────────┘
 
+## pytorch_attention
+
+a. 
+Source: `results/attn_B200_20260921-105153.txt`
+
+Command: `python -m cs336_systems.attn_bench --device cuda --out /tmp/attn.txt` (defaults: warmup 5, 100 iters, batch 8)
+
+Times are the mean of 100 passes. Memory is `torch.cuda.memory_allocated()` after `y` is built, so right before backward starts. No config went OOM.
+
+i, ii, iii, iv, v, vi all in the script cs336_systems/attn_bench.py
+
+| d_model | seq_len | forward (ms) | backward (ms) | memory before backward (MiB) |
+|--------:|--------:|-------------:|--------------:|-----------------------------:|
+| 16  | 256   | 0.173 | 0.840 | 12.6 |
+| 16  | 1024  | 0.229 | 0.723 | 82.8 |
+| 16  | 4096  | 2.36  | 4.91  | 1062.6 |
+| 16  | 8192  | 9.44  | 17.7  | 4189.0 |
+| 16  | 16384 | 36.3  | 67.0  | 16681.8 |
+| 32  | 256   | 0.166 | 0.831 | 21.1 |
+| 32  | 1024  | 0.237 | 1.11  | 84.3 |
+| 32  | 4096  | 2.45  | 4.79  | 1068.6 |
+| 32  | 8192  | 9.79  | 18.0  | 4201.0 |
+| 32  | 16384 | 37.8  | 68.6  | 16705.8 |
+| 64  | 256   | 0.185 | 0.800 | 21.8 |
+| 64  | 1024  | 0.257 | 1.21  | 87.3 |
+| 64  | 4096  | 2.76  | 5.78  | 1080.6 |
+| 64  | 8192  | 11.0  | 20.4  | 4225.0 |
+| 64  | 16384 | 42.8  | 78.6  | 16753.8 |
+| 128 | 256   | 0.189 | 1.32  | 23.3 |
+| 128 | 1024  | 0.297 | 1.26  | 93.3 |
+| 128 | 4096  | 3.31  | 6.85  | 1104.6 |
+| 128 | 8192  | 13.3  | 25.3  | 4273.0 |
+| 128 | 16384 | 51.4  | 95.2  | 16849.8 |
+Because I used a B200 my models don't get out of memory errors. None of the models run out of memory. I will look at the trends of runtime and memory wrt d_model and seq_len. Runtime goes quadratically with sequence length, and colinearly with s and d (s * d has a coefficient of 0.02, p = 0.011). Memory used during backward grows quadratically with sequence length (coef = 64.6, p < 0.0001), linearly with d_model (coef = 5.7, p < 0.0001 ). The memory complexity for backward has the same factors as forward, which is dominated by sequence length, so a B x 2seq_len x d_model input uses 4x more memory in attention than a B x seq_len x d_model tensor input. What would I do to eliminate this memory cost? Based on the section before this problem, there's a method called FlashAttention-2 that avoids explicitly materializing that seq_len x seq_len attention score matrix.
+
+Memory Accounting, using the 3 major lines in the benchmark script
+        QKt: torch.Tensor = Q @ K.mT -> (B, T, C) @ (B, C, T) -> (B, T, T) 
+            (B, T, T)= 8 x 16384 x 16384
+            2,147,483,648 float32's
+            = 8,589,934,592 bytes
+            = 8,192 MiB, which isn't directly saved because it's not directly related to the gradients, but I will save this calculation for reference.
+        QKt = QKt.masked_fill(~causal_mask, -float('inf'))  <- Save the bytes for the causal mask (T x T) = 268,435,456 bytes = 256 MiB
+        attn_output = softmax(QKt / math.sqrt(self.d_model)) @ V
+            - softmax(X)
+                rescaled_input = x - torch.max(x, dim=dim, keepdim=True)[0] <- this operation's gradient doensn't depend on x, so its values aren't saved
+                exponentiated_rescaled_input = torch.exp(rescaled_input) -> (B, T, T) = 8,192 MiB
+                return exponentiated_rescaled_input / torch.sum(exponentiated_rescaled_input, dim=dim, keepdim=True) -> In-place, this allocates new memory for the bottom value <- allocate a single float32 (4 bytes, trivial)
+                exponentiated_rescaled_input / torch.sum(exponentiated_rescaled_input, dim=dim, keepdim=True) <- This result allocates 8,192 MiB
+            - softmax( _ ) @ V
+                (B, T, T) @ (B, T, C) = (B, T, C)
+                (8, 16384, 16) = 8,388,608 bytes
+                = 8 MiB <- Irrelevant! 
+
+        Total:
+            0 QKt
+          256 causal_mask
+        8,192 torch.exp(rescaled_input) = ERI
+        8,192 ERI / torch.sum()
+           <1 torch.sum()
+            8 softmax() @ V
+        16648MiB, compared to 16681.8 = 33.8MiB off 
+
+
 ## torch_compile
 
 Torch Compile (2 points)
