@@ -4,7 +4,7 @@ import logging
 import math
 import os
 import warnings
-
+import typing
 import einx
 import torch
 import torch.nn as nn
@@ -117,14 +117,14 @@ class CheckpointedTransformerLM(nn.Module):
         # (batch size, sequence_length, d_model)
         # x = self.positional_encoder(embedded_tokens, positions)
         x = embedded_tokens
-        def make_fn(x: torch.Tensor, fns: List[Callable[[torch.Tensor], torch.Tensor]]) -> torch.Tensor:
+        def run_fns(x: torch.Tensor, fns: List[Callable[[torch.Tensor], torch.Tensor]]) -> torch.Tensor:
             for fn in fns:
                 x = fn(x)
             return x
         
         for i in range(0, len(self.layers), self.checkpoint_chunk_size):
             # (batch size, sequence_length, d_model)
-            x: torch.Tensor = torch.Tensor(checkpoint.checkpoint(make_fn, x, self.layers[i:i+self.checkpoint_chunk_size],use_reentrant=False))
+            x: torch.Tensor = typing.cast(torch.Tensor, checkpoint.checkpoint(run_fns, x, self.layers[i:i+self.checkpoint_chunk_size],use_reentrant=False))
         # (batch size, sequence_length, d_model)
         x = self.ln_final(x)
         # (batch size, sequence_length, vocab_size)
