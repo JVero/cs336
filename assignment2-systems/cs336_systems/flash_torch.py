@@ -47,7 +47,6 @@ class FlashAttentionPytorch(torch.autograd.Function):
                 inner = torch.exp(mijm1 - mij)
                 lij = inner * lij + rowsumPij
                 # Line 13
-                prev_oi_shape = Oi.shape
                 Oi = inner[..., :, None] * Oi + Pij @ Vtile
             # Line 14, end the for loop <- obvious, but just so *every* line is accounted for
             # Line 15
@@ -76,4 +75,3 @@ if __name__ == "__main__":
     V = torch.randn((B, T, d_model), requires_grad=True)
     ctx = torch.autograd.function.FunctionCtx()
     O = FlashAttentionPytorch.apply(Q, K, V)
-    O.sum().backward()
