@@ -1,19 +1,8 @@
-%%writefile flash_triton.py
 import torch
 
 import triton.language as tl
 import triton
 import math
-
-# TODO (tomorrow):
-# x O_block_ptr: batch offset uses stride_qb, should use stride_ob
-# x L_block_ptr: add batch offset to base pointer (stride_lb)
-# x L_block_ptr: 1D, so strides / offsets / block_shape / order get one entry each
-# x Line 6: init accumulators before the loop (O tile, l, m) with tl.zeros / tl.full
-# - Loop body: load K, V tiles (boundary_check), then steps 9-13 as in the torch version
-# - After loop: step 15 (normalize O, compute L), store O and L (boundary_check)
-# - FlashAttentionTriton: allocate O and L, launch grid (Tq, batch), save for backward
-# - Test: first stage = copy Q into O to check pointers, then compare to torch version
 
 @triton.jit
 def flash_fwd_kernel(Q_ptr, K_ptr, V_ptr,
@@ -81,17 +70,31 @@ def flash_fwd_kernel(Q_ptr, K_ptr, V_ptr,
     l = tl.zeros((Q_TILE_SIZE,), dtype=tl.float32)
     m = tl.full((Q_TILE_SIZE,), dtype=tl.float32, value=-float("inf"))
 
+    start_idx_q = query_tile_index * Q_TILE_SIZE
+
     # num_q_tiles = tl.cdiv(N_QUERIES, Q_TILE_SIZE)
     num_k_tiles = tl.cdiv(N_KEYS, K_TILE_SIZE)
     # Line 5
     Qtile = tl.load(Q_block_ptr, boundary_check=(0, 1), padding_option="zero")
     # still need to initialize l and m
     for i in tl.range(num_k_tiles):
+        
         Ktile = tl.load(K_block_ptr, boundary_check=(0, 1), padding_option="zero")
         Vtile = tl.load(V_block_ptr, boundary_check=(0, 1), padding_option="zero")
         # Line 9
         Sij = tl.dot(Qtile, tl.trans(Ktile)) * scale
-        ## Causal Masking here
+
+        if is_causal:
+            ## Causal Masking here
+            k_idxs = tl.arange(0, K_TILE_SIZE)
+            k_idxs += i * K_TILE_SIZE
+
+            q_idxs = tl.arange(0, Q_TILE_SIZE)
+            q_idxs += query_tile_index*Q_TILE_SIZE
+                
+            causal_mask = q_idxs[:, None] >= k_idxs[None, :]
+            Sij = tl.where(causal_mask, Sij, -1e6)
+
         # Line 10
         new_maxes = tl.max(Sij, axis=-1)
         prev_maxes = m
@@ -141,6 +144,20 @@ class FlashAttentionTriton(torch.autograd.Function):
             tl.constexpr(Bq), tl.constexpr(Bk),
             is_causal=tl.constexpr(is_causal)
         )
-        ctx.is_causal = True
         ctx.save_for_backward(Q,K,V,O,L)
         return O
+
+def main():
+    if not torch.cuda.is_available():
+        print("CUDA not available")
+        return
+    B, T, C = 10, 256, 128
+    Q = torch.randn((B, T, C), device="cuda")
+    K = torch.randn_like(Q)
+    V = torch.randn_like(Q)
+    for is_causal in [True, False]:
+        O = FlashAttentionTriton.apply(Q, K, V, is_causal)
+        O_ref = torch.nn.functional.scaled_dot_product_attention(Q, K, V, is_causal=is_causal)
+        print(f"{is_causal=}: {torch.max(O - O_ref).abs()}")
+if __name__ == "__main__":
+    main()
