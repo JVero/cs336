@@ -1,6 +1,7 @@
 import torch
 from einops import rearrange
 import math
+from cs336_systems.backward_math import backward_math
 
 class FlashAttentionPytorch(torch.autograd.Function):
     @staticmethod
@@ -26,9 +27,9 @@ class FlashAttentionPytorch(torch.autograd.Function):
             # Line 5
             Qtile = q_tiles[i] # Explicitly doing this, to match the algorithm
             # Line 6
-            Oi = torch.zeros((*B, Qtile.shape[-2], d_model))
-            lij = torch.zeros(Qtile.shape[-2])
-            mij = -float('inf') * torch.ones(Qtile.shape[-2])
+            Oi = torch.zeros((*B, Qtile.shape[-2], d_model), device=Q.device)
+            lij = torch.zeros(Qtile.shape[-2], device=Q.device)
+            mij = -float('inf') * torch.ones(Qtile.shape[-2], device=Q.device)
             # Line 7
             for j in range(num_k_tiles):
                 # Line 8
@@ -58,20 +59,23 @@ class FlashAttentionPytorch(torch.autograd.Function):
         O = torch.cat(Otiles,dim=-2)
         L = torch.cat(Ltiles,dim=-1)
         ctx.save_for_backward(Q, K, V, O, L)
+        ctx.is_causal = is_causal # type: ignore
         return O
+    
     @staticmethod
     def backward(ctx: torch.autograd.function.FunctionCtx, grad_out):
-        print(len(ctx.saved_tensors))
         Q, K, V, O, L = ctx.saved_tensors
-
+        is_causal = ctx.is_causal
+        return *backward_math(Q, K, V, O, L, grad_out, is_causal=is_causal), None
         
-### Claude you can comment on code down here
 if __name__ == "__main__":
     B = 10
     T = 100
     d_model = 11
-    Q = torch.randn((B, T, d_model), requires_grad=True)
-    K = torch.randn((B, T, d_model), requires_grad=True)
-    V = torch.randn((B, T, d_model), requires_grad=True)
+    device = "mps" if torch.mps.is_available() else "cuda"
+    Q = torch.randn((B, T, d_model), requires_grad=True, device=device)
+    K = torch.randn_like(Q)
+    V = torch.randn_like(Q)
     ctx = torch.autograd.function.FunctionCtx()
     O = FlashAttentionPytorch.apply(Q, K, V)
+    O.sum().backward()

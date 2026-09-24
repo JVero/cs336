@@ -3,8 +3,11 @@ from __future__ import annotations
 import torch
 
 from cs336_systems.flash_torch import FlashAttentionPytorch
-from cs336_systems.flash_triton import FlashAttentionTriton
-
+try: 
+    import triton
+    from cs336_systems.flash_triton import FlashAttentionTriton
+except:
+    pass
 
 def get_flashattention_autograd_function_pytorch() -> type:
     """

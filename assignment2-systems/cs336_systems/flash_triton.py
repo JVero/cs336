@@ -4,6 +4,8 @@ import triton.language as tl
 import triton
 import math
 
+from cs336_systems.backward_math import backward_math
+
 @triton.jit
 def flash_fwd_kernel(Q_ptr, K_ptr, V_ptr,
                      O_ptr, L_ptr,
@@ -144,8 +146,16 @@ class FlashAttentionTriton(torch.autograd.Function):
             tl.constexpr(Bq), tl.constexpr(Bk),
             is_causal=tl.constexpr(is_causal)
         )
+        ctx.is_causal = is_causal
         ctx.save_for_backward(Q,K,V,O,L)
         return O
+
+    @staticmethod
+    def backward(ctx: torch.autograd.function.FunctionCtx, grad_out):
+        Q, K, V, O, L = ctx.saved_tensors
+        is_causal = ctx.is_causal
+        return *backward_math(Q, K, V, O, L, grad_out, is_causal=is_causal), None, None, None
+        
 
 def main():
     if not torch.cuda.is_available():
@@ -158,6 +168,6 @@ def main():
     for is_causal in [True, False]:
         O = FlashAttentionTriton.apply(Q, K, V, is_causal)
         O_ref = torch.nn.functional.scaled_dot_product_attention(Q, K, V, is_causal=is_causal)
-        print(f"{is_causal=}: {torch.max(O - O_ref).abs()}")
+        print(f"{is_causal=}: {torch.max((O - O_ref).abs())}")
 if __name__ == "__main__":
     main()
