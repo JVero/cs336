@@ -103,7 +103,7 @@ def flash_fwd_kernel(Q_ptr, K_ptr, V_ptr,
         m = tl.maximum(new_maxes, prev_maxes)
         
         # Line 11
-        Pij = tl.exp(Sij - m[:, None]) # <- different from pytorch because m has no batch dim here
+        Pij = tl.exp(Sij - m[:, None]).to(V_block_ptr.type.element_ty) # <- different from pytorch because m has no batch dim here
         # Line 12 
         rowsumPij = tl.sum(Pij, axis=-1)
         inner = tl.exp(prev_maxes - m)
@@ -118,8 +118,9 @@ def flash_fwd_kernel(Q_ptr, K_ptr, V_ptr,
         V_block_ptr = V_block_ptr.advance((K_TILE_SIZE, 0))
     # Line 15
     Oi = Oi / l[:, None]
+    Oi = Oi.to(O_block_ptr.type.element_ty)
     Li = m + tl.log(l)
-    
+    Li = Li.to(L_block_ptr.type.element_ty)
     tl.store(O_block_ptr,Oi)
     tl.store(L_block_ptr,Li)
     
@@ -129,7 +130,7 @@ class FlashAttentionTriton(torch.autograd.Function):
     @staticmethod
     def forward(ctx, Q, K, V, is_causal=False, Bq=16, Bk=32):
         O = torch.empty_like(Q, device="cuda") # I bet empty_like allocates the device to be Q's device, but just to be explicit
-        L = torch.zeros((Q.shape[:-1]), device="cuda")
+        L = torch.zeros((Q.shape[:-1]), dtype=Q.dtype, device="cuda")
         N_QUERIES = Q.shape[-2]
         N_KEYS = K.shape[-2]
         scale = 1/math.sqrt(Q.shape[-1])
