@@ -130,7 +130,7 @@ class FlashAttentionTriton(torch.autograd.Function):
     @staticmethod
     def forward(ctx, Q, K, V, is_causal=False, Bq=16, Bk=32):
         O = torch.empty_like(Q, device="cuda") # I bet empty_like allocates the device to be Q's device, but just to be explicit
-        L = torch.zeros((Q.shape[:-1]), dtype=Q.dtype, device="cuda")
+        L = torch.zeros((Q.shape[:-1]), dtype=torch.float32, device="cuda")
         N_QUERIES = Q.shape[-2]
         N_KEYS = K.shape[-2]
         scale = 1/math.sqrt(Q.shape[-1])

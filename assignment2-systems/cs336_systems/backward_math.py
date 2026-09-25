@@ -14,13 +14,13 @@ def backward_math(Q, K, V, O, L, grad_out, is_causal=False):
         kept_mask = q_range[:, None] >= k_range[None, :]
         S[..., ~kept_mask] = -float("inf")
     # eq 14 
-    Pij = torch.exp(S - L[..., :, None])
+    Pij = torch.exp(S - L[..., :, None]).to(Q.dtype)
     # eq 15
-    dV = Pij.mT @ dO
+    dV = Pij.mT.to(Q.dtype) @ dO
     # eq 16
     dP = dO @ V.mT
     # eq 17
-    dSij = Pij * (dP - D[..., :, None])
+    dSij = (Pij * (dP - D[..., :, None])).to(Q.dtype)
     dQ = dSij @ K / math.sqrt(Q.shape[-1])
     dK = dSij.mT @ Q / math.sqrt(Q.shape[-1])
     return dQ, dK, dV
