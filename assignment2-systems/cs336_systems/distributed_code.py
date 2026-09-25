@@ -28,19 +28,23 @@ def setup(rank, world_size):
     os.environ["MASTER_PORT"] = "29500"
     dist.init_process_group("gloo", rank=rank, world_size=world_size)
     
-def distributed_demo(rank, world_size, data: torch.Tensor, fp):
+def distributed_demo(rank, world_size, n_floats, fp):
     setup(rank, world_size)
-    dist.all_reduce(data)
-    pre = time.time()
+    data = torch.ones(n_floats)
     for _ in range(2):
         dist.all_reduce(data)
+    dist.barrier()
+    pre = time.time()
+    n_iters = 10
+    for _ in range(n_iters):
+        dist.all_reduce(data)
     times = [0 for _ in range(world_size)]
-    elapsed = time.time() - pre
+    elapsed = (time.time() - pre)/n_iters
     dist.all_gather_object(times, elapsed)
     if rank!=0 or fp is None:
         return
     with open(fp, "a+") as f:
-        f.write(",".join([str(round(x,3)) for x in [world_size, data.numel() * 4, np.mean(times)]]) + "\n")
+        f.write(",".join([str(x) for x in [world_size, data.numel() * 4, np.mean(times)]]) + "\n")
 
 
 def main():
@@ -55,12 +59,9 @@ def main():
             for size_choice in size_choices:
                 print(f"{world_size=}, {size_choice=}")
                 n_floats = num_floats[size_choice]
-                data = torch.ones(n_floats,)
                 ## Warmup
                 n_warmup = 0
-                for _ in range(n_warmup):
-                    warmup = mp.spawn(fn=distributed_demo, args=(world_size, data, None), nprocs=world_size, join=True)
-                res = mp.spawn(fn=distributed_demo, args=(world_size, data, fp), nprocs=world_size, join=True)
+                res = mp.spawn(fn=distributed_demo, args=(world_size, n_floats, fp), nprocs=world_size, join=True)
                 # f.write(",".join([str(x) for x in [world_size, size_choice,res]])+"\n")
             
 if __name__ == "__main__":
