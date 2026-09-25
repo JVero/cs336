@@ -705,7 +705,7 @@ The forwards are clearly faster, but the backward is slower than the naive atten
 ## distributed_communication_single_node
 
 Distributed Communication (Single Node) (5 points)
-
+For convenience I ran this code using Gloo. The plot that shows average processing time from each worker and net throughput is in results/dist_bench.png. Basically this demonstrates that for a simple reduce task like adding tensors together, adding more processes adds overhead on a single node. This makes sense because the work of adding the tensors isn't divided across them in a way that reduces compute for any given pair of workers. With respect to size of the input, small inputs are more influenced by overhead.
 
 ## naive_ddp
 
