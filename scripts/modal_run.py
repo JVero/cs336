@@ -8,6 +8,7 @@ Same image and mount as modal_bench.py.
 Launch (from the workspace root):
     modal run scripts/modal_run.py --pytest "-k test_flash_forward_pass_triton -x"
     modal run scripts/modal_run.py --script scratch/flash_check.py   # any .py, path from assignment2-systems
+    modal run scripts/modal_run.py --script cs336_systems/naive_ddp.py --args "--backend nccl --modelsize xl" --gpu H100:2
     modal run scripts/modal_run.py --script tests/flash_benchmarking.py --fetch results/flash_bench.csv --timeout 3600
 
 Output is streamed as it runs. stderr is merged into stdout, so a Triton compile error shows
@@ -62,11 +63,11 @@ def run(cmd: list[str], fetch: str = "") -> tuple[int, bytes | None]:
 
 
 @app.local_entrypoint()
-def main(pytest: str = "", script: str = "", gpu: str = "A10G", fetch: str = "", timeout: int = 900) -> None:
+def main(pytest: str = "", script: str = "", args: str = "", gpu: str = "A10G", fetch: str = "", timeout: int = 900) -> None:
     if not pytest and not script:
         raise ValueError("Both --pytest and --script can't be empty. For reverence, try '--pytest \"-k flash_forward\"")
     if script:
-        cmd = ["python", script]
+        cmd = ["python", script, *shlex.split(args)]
     else:
         cmd = ["python", "-m", "pytest", *shlex.split(pytest)]
     code, data = run.with_options(gpu=gpu, timeout=timeout).remote(cmd, fetch)
