@@ -96,7 +96,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `flash_benchmarking` FlashAttention-2 Benchmarking (5 pts)
 - [x] `distributed_communication_single_node` Distributed Communication (Single Node) (5 pts)
 - [x] `naive_ddp` Naïve DDP (5 pts)
-- [ ] `naive_ddp_benchmarking` Naïve DDP Benchmarking (3 pts)
+- [x] `naive_ddp_benchmarking` Naïve DDP Benchmarking (3 pts)
 - [ ] `minimal_ddp_flat_benchmarking` Minimal DDP with Flat Gradients Benchmarking (2 pts)
 - [ ] `ddp_overlap_individual_parameters` DDP with Overlapping Individual Parameters (5 pts)
 - [ ] `ddp_overlap_individual_parameters_benchmarking` DDP Overlapping Individual Parameters Benchmarking (1 pt)

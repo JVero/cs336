@@ -716,7 +716,30 @@ Naïve DDP (5 points)
 
 Naïve DDP Benchmarking (3 points)
 
+Deliverable: A description of your benchmarking setup, along with the measured time per
+training iteration and time spent communicating gradients for each setting.
 
+I ran the benchmark with the variant of GPT2-XL specified in the handout and the assignment, with 1 node with 2 H100s running NCCL, using full precision floats. Each worker only had 1 sequence, because batch_size wasn't a salient variable here. I warmed up the model with 3 warmup steps.
+
+
+My benchmark script is under cs336_systems/naive_ddp.py. 
+
+`modal run scripts/modal_run.py --script cs336_systems/naive_ddp.py --args "--backend nccl --modelsize xl" --gpu H100:2`
+
+The data below is based on a script that is 10x lower than it should be, because the profiling script divided by an extra 10 (I did 10 full steps and broke down the timing by relevant component). After each value I'll put an arrow doing the correction, and converting from ns to ms
+
+Mean forward time: 6809053.0 -> 68ms
+Mean time averaging gradients: 4892637.5 -> 49ms
+Mean backward time: 22376628.0 -> 223ms
+Mean optimizer step time: 12097831.0 -> 121ms
+Mean step time: 46244220.0 -> 462ms
+Percent of full step:
+Grad: 10.579998016357422%
+Fwd: 14.724116325378418%
+Back: 48.387943267822266%
+Optim: 26.16073989868164%
+
+Fwd, Back, and Optim all have their same relationship as in previous profiles, and the grad sync grows linearly with model size.
 ## minimal_ddp_flat_benchmarking
 
 Minimal DDP with Flat Gradients Benchmarking (2 points)
