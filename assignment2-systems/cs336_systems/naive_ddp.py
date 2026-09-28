@@ -1,25 +1,10 @@
 import os
 import torch
 import torch.distributed as dist
+
 import torch.multiprocessing as mp
-from einops import rearrange
 
 from tests.common import ToyModel
-# from torchvision.models import mobilenet_v3_small # <- in case we want a "simpler" model
-import argparse
-
-argp = argparse.ArgumentParser()
-worker_choices = [2,4,6]
-argp.add_argument("--num_workers", type=int, default=4, choices=worker_choices)
-
-argp.add_argument("--loop", action="store_true")
-
-num_floats = { 
-             "1MB": 2**20//4,
-             "10MB": 2**20//4*10,
-             "100MB": 2**20//4*100,
-             "1GB": 2**28 # 2^30 / 4
-}
 
 def setup(rank, world_size):
     os.environ["MASTER_ADDR"] = "localhost"
