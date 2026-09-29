@@ -76,6 +76,16 @@ need: CPU sampling (perf_event_open) and --gpu-metrics-devices (hardware counter
 kernel, and NVTX tracing do not need them. That is why NSYS_BASE has --sample=none; if a run
 still complains, add --cpuctxsw=none to --nsys.
 
+Any other script (--script) is profiled whole: no capture range, since it has no "Measurement"
+NVTX range, so its warmup is in the file too. --args takes that script's own flags. This is for
+the DDP traces (handout ddp_overlap_individual_parameters_benchmarking (b)); mp.spawn children
+are traced along with the parent, one CUDA HW row per GPU:
+    modal run scripts/modal_nsys.py --gpu H100:2 --script cs336_systems/naive_ddp.py \
+        --args "--backend nccl --ddp overlapping --modelsize xl" --nsys "--pytorch=functions-trace"
+The run directory is named from the script and its args
+(results/naive_ddp_backend-nccl_ddp-overlapping_modelsize-xl/); no timing CSV comes back, since
+the script prints its own numbers to the log.
+
 Default GPU is H100 (80 GB, about $4/h). A100-80GB is the cheaper 80 GB option (about
 $2.50/h). Anything with 24 GB (A10G, L4) fits at most the medium size.
 """
@@ -108,6 +118,8 @@ NSYS_BASE = [
 ]
 # Environment for the bench script. nsys takes one --env-var flag holding a comma-separated list
 # of NAME=VALUE pairs; --env appends to this list.
+# --script runs have no Measurement range, so they record everything with just the tracing flags.
+NSYS_WHOLE = NSYS_BASE[:2]
 NSYS_ENV = ["NSYS_NVTX_PROFILER_REGISTER_ONLY=0"]
 
 # Version from the CUDA apt repo's Debian 12 tree. 2025.6.3 pairs with CUDA 13.2 and covers the
@@ -150,7 +162,7 @@ image = (
         f"command -v nsys || ln -s /opt/nvidia/nsight-systems/{NSYS_VERSION}/bin/nsys /usr/local/bin/nsys",
         "nsys --version",
     )
-    .env({"PYTHONUNBUFFERED": "1", "PYTHONPATH": f"{REMOTE_A2}/cs336-basics"})
+    .env({"PYTHONUNBUFFERED": "1", "PYTHONPATH": f"{REMOTE_A2}:{REMOTE_A2}/cs336-basics"})
     .add_local_dir(A2, remote_path=REMOTE_A2, ignore=IGNORE)
 )
 
@@ -165,20 +177,18 @@ def check() -> str:
 
 @app.function(image=image, gpu="H100", volumes={RUNS_MOUNT: runs_vol}, timeout=3600)
 def profile(
-    flags: list[str], nsys_flags: list[str], env: list[str], name: str, reports: str
+    target: list[str], base: list[str], nsys_flags: list[str], env: list[str], name: str, reports: str
 ) -> tuple[int, str, bytes, dict[str, str]]:
     """Returns (exit code, timing CSV text, .nsys-rep bytes, {"_<report>.csv": CSV text, ...}).
 
-    `nsys_flags` go after NSYS_BASE; `env` is NAME=VALUE pairs added to NSYS_ENV for the bench
-    script; `reports` is the comma-separated list for `nsys stats --report`.
+    `target` is the command nsys runs; `base` is NSYS_BASE or NSYS_WHOLE, and `nsys_flags` go
+    after it; `env` is NAME=VALUE pairs added to NSYS_ENV for the target; `reports` is the
+    comma-separated list for `nsys stats --report`.
     """
     cmd = [
-        "nsys", "profile", *NSYS_BASE, "--env-var=" + ",".join(NSYS_ENV + env), *nsys_flags,
+        "nsys", "profile", *base, "--env-var=" + ",".join(NSYS_ENV + env), *nsys_flags,
         "--output", REMOTE_REP_STEM, "--force-overwrite", "true",
-        "--", "python", "-m", "cs336_systems.bench_script",
-        "--device", "cuda",
-        "--of_name", REMOTE_CSV,
-        *flags,
+        "--", *target,
     ]
     print("$", " ".join(shlex.quote(c) for c in cmd), flush=True)
     subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], check=False)
@@ -244,7 +254,9 @@ def _flag_value(args: list[str], flag: str) -> str | None:
 
 @app.local_entrypoint()
 def main(
-    flags: str,
+    flags: str = "",
+    script: str = "",
+    args: str = "",
     nsys: str = "",
     env: str = "",
     gpu: str = "H100",
@@ -253,17 +265,23 @@ def main(
     reports: str = DEFAULT_REPORTS,
 ) -> None:
     flag_list = shlex.split(flags)
+    args_list = shlex.split(args)
+    if script and flags:
+        raise SystemExit("--flags is for bench_script; pass a --script's own flags with --args")
+    if args and not script:
+        raise SystemExit("--args goes with --script; bench_script takes --flags")
+    base = NSYS_WHOLE if script else NSYS_BASE
     nsys_list = shlex.split(nsys)
     env_list = [e.strip() for e in env.split(",") if e.strip()]
     for owned in ("--device", "--of_name"):
-        if _has_flag(flag_list, owned):
+        if not script and _has_flag(flag_list, owned):
             raise SystemExit(f"{owned} is set by the launcher; drop it from --flags (use --out for the local path)")
     for owned in ("-o", "--output", "-f", "--force-overwrite"):
         if _has_flag(nsys_list, owned):
             raise SystemExit(f"{owned} is set by the launcher; drop it from --nsys (use --out for the local path)")
     if _has_flag(nsys_list, "--env-var"):
         raise SystemExit("--env-var is set by the launcher; pass the variables with --env instead")
-    for owned in (base.split("=")[0] for base in NSYS_BASE):
+    for owned in (b.split("=")[0] for b in NSYS_BASE):
         if _has_flag(nsys_list, owned):
             raise SystemExit(f"{owned} is set by the launcher (NSYS_BASE); drop it from --nsys or edit NSYS_BASE")
     for pair in env_list:
@@ -272,11 +290,26 @@ def main(
     report_list = ",".join(r.strip() for r in reports.split(",") if r.strip())
     if not report_list:
         raise SystemExit("--reports needs at least one report name")
-    model = _flag_value(flag_list, "--model")
-    ctx = _flag_value(flag_list, "--context_length")
-    if model is None or ctx is None:
-        raise SystemExit("--flags must include --model and --context_length; they name the run")
-    run_dir = pathlib.Path(out) if out else A2 / "results" / f"{model}_{ctx}"
+    if script:
+        if not (A2 / script).is_file():
+            raise SystemExit(f"--script is a path from assignment2-systems; {A2 / script} does not exist")
+        target = ["python", script, *args_list]
+        # "--ddp overlapping" -> "ddp-overlapping": join each flag to its value with a dash.
+        parts = [pathlib.Path(script).stem]
+        for a in args_list:
+            if a.startswith("-") or not parts[1:]:
+                parts.append(a.lstrip("-"))
+            else:
+                parts[-1] += "-" + a
+        default_name = "_".join(parts)
+    else:
+        model = _flag_value(flag_list, "--model")
+        ctx = _flag_value(flag_list, "--context_length")
+        if model is None or ctx is None:
+            raise SystemExit("--flags must include --model and --context_length; they name the run")
+        target = ["python", "-m", "cs336_systems.bench_script", "--device", "cuda", "--of_name", REMOTE_CSV, *flag_list]
+        default_name = f"{model}_{ctx}"
+    run_dir = pathlib.Path(out) if out else A2 / "results" / default_name
     name = run_dir.name
     stem = run_dir / name
     if not out and run_dir.is_dir() and any(run_dir.iterdir()):
@@ -288,7 +321,7 @@ def main(
     rep_path = pathlib.Path(f"{stem}.nsys-rep")
     fn = profile.with_options(gpu=gpu, timeout=int(timeout_hours * 3600))
     try:
-        returncode, csv, rep, stats_csvs = fn.remote(flag_list, nsys_list, env_list, name, report_list)
+        returncode, csv, rep, stats_csvs = fn.remote(target, base, nsys_list, env_list, name, report_list)
     except KeyboardInterrupt:
         print(f"\ninterrupted; files written before that are on the volume. Fetch the run with:\n"
               f"  modal volume get cs336-runs /a2/{name} {run_dir.parent}/")
@@ -297,7 +330,7 @@ def main(
     if csv:
         csv_path.write_text(csv)
         print(f"\n{csv}wrote {csv_path}")
-    else:
+    elif not script:
         print("\nno CSV came back")
     if rep:
         rep_path.write_bytes(rep)
@@ -309,7 +342,7 @@ def main(
     if not stats_csvs:
         print("no stats CSVs came back")
     if returncode != 0:
-        raise SystemExit(f"nsys/bench_script exited with code {returncode}")
+        raise SystemExit(f"nsys/{script or 'bench_script'} exited with code {returncode}")
     if not rep:
         raise SystemExit("no .nsys-rep came back: nsys wrote no profile, so the capture range never "
                          "triggered; check the nsys messages in the log above")
