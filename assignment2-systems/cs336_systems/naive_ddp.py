@@ -9,7 +9,7 @@ from cs336_basics.model import BasicsTransformerLM
 from cs336_basics.nn_utils import cross_entropy
 from tests.common import ToyModel
 
-from cs336_systems.ddp import NaiveDistributor
+from cs336_systems.ddp import *
 
 import time
 import numpy as np
@@ -46,7 +46,8 @@ def mytimer(times):
         times.append(torch.Tensor([end_time-start_time]))
     
 cls_options = {
-    "naive": NaiveDistributor
+    "naive": NaiveDistributor,
+    "flat": FlatDistributor
 }
 
 backend_options = ["gloo", "nccl"]

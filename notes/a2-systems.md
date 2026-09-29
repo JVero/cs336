@@ -743,7 +743,32 @@ Fwd, Back, and Optim all have their same relationship as in previous profiles, a
 ## minimal_ddp_flat_benchmarking
 
 Minimal DDP with Flat Gradients Benchmarking (2 points)
+Local run (using small ToyModel)
+`uv run -m cs336_systems.naive_ddp --ddp flat`
+┌────────────┬─────────┬────────┐
+│            │  Naive  │  Flat  │
+├────────────┼─────────┼────────┤
+│ Grad sync  │ 6.1 ms  │ 1.8 ms │ Savings of 4.3ms
+├────────────┼─────────┼────────┤
+│ Full step  │ 12.9 ms │ 8.6 ms │ Savings of 4.3ms
+├────────────┼─────────┼────────┤
+│ Sync share │ 47%     │ 21%    │ The entire decrease is due to cheaper sync 
+└────────────┴─────────┴────────┘ (rather than noise from other parts of it)
 
+Cloud run 
+`modal run scripts/modal_run.py --script cs336_systems/naive_ddp.py --args "--backend nccl --ddp flat --modelsize xl" --gpu H100:2`
+
+┌────────────┬────────┬────────┐
+│            │ Naive  │  Flat  │
+├────────────┼────────┼────────┤
+│ Grad sync  │ 49 ms  │ 40 ms  │ 9ms
+├────────────┼────────┼────────┤
+│ Full step  │ 462 ms │ 447 ms │ 15ms
+├────────────┼────────┼────────┤
+│ Sync share │ 10.6%  │ 8.9%   │ Not all of the savings are from the decrease 
+└────────────┴────────┴────────┘ in sync
+
+You can see that there are more savings in the smaller model, which makes sense because the multiple function calls in naive give a large flat overhead ,which dominates the cost of the smaller model, compared to the actual computations.
 
 ## ddp_overlap_individual_parameters
 
