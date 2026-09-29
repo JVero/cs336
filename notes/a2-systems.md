@@ -773,13 +773,34 @@ You can see that there are more savings in the smaller model, which makes sense 
 ## ddp_overlap_individual_parameters
 
 DDP with Overlapping Individual Parameters (5 points)
-
+Full step times mean time: 420600640.0 -> 420ms
+Forward step times mean time: 67533968.0 -> 67.5ms
+Backward step times mean time: 249202560.0 -> 249ms
+Mean time averaging gradients mean time: 2295745.75 -> 2.3ms
+Mean optimizer step time mean time: 101110480.0 -> 101ms
+Percent of full step:
+Grad: 0.5458255410194397%
+Fwd: 16.05655288696289%
+Back: 59.249210357666016%
+Optim: 24.0395450592041
 
 ## ddp_overlap_individual_parameters_benchmarking
 
 DDP Overlapping Individual Parameters Benchmarking (1 point)
+           | Naive | Flat | Overlap | Naive-Overlap
+Grad sync  | 49ms  | 40ms |  2.3ms  | -46.7ms
+Full Step  | 462ms | 447ms| 420ms   | -42ms
 
+a. Overlap results in a ~47ms reduction, most of which shows in the net timing of the steps, and is successfully folded into existing calculation time.
+b. Command 1
+`modal run scripts/modal_nsys.py --gpu H100:2 --script cs336_systems/naive_ddp.py \
+    --args "--backend nccl --ddp naive --modelsize xl" --nsys "--pytorch=functions-trace"`
 
+Command 2
+`modal run scripts/modal_nsys.py --gpu H100:2 --script cs336_systems/naive_ddp.py \
+    --args "--backend nccl --ddp overlapping --modelsize xl" --nsys "--pytorch=functions-trace"`
+
+Each of the results screenshots (in the results folder under their corresponding benchmark results folders), it shows that in the naive version NCCL happens in the same thread as the pytorch calls, which block the subsequent calls to the optimizer steps , but the async version has a different threaed "pt_autograd_1", which has all the ncclAllReduce calls happening concurrently with torch.autograd.backward because of the hooks that fire when the gradients are ready.
 ## optimizer_state_sharding
 
 Optimizer State Sharding (15 points)

@@ -47,7 +47,8 @@ def mytimer(times):
     
 cls_options = {
     "naive": NaiveDistributor,
-    "flat": FlatDistributor
+    "flat": FlatDistributor,
+    "overlapping": OverlappingDistributor
 }
 
 backend_options = ["gloo", "nccl"]

@@ -9,7 +9,7 @@ try:
 except:
     pass
 
-from cs336_systems.ddp import NaiveDistributor
+from cs336_systems.ddp import NaiveDistributor, OverlappingDistributor
 
 def get_flashattention_autograd_function_pytorch() -> type:
     """
