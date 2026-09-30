@@ -6,7 +6,7 @@ from torch.optim import Optimizer
 
 
 class NaiveDistributor(torch.nn.Module):
-    def __init__(self, module: torch.nn.Module, device: str | None =None):
+    def __init__(self, module: torch.nn.Module):
         super().__init__()
         self.module = module
         if torch.cuda.is_available():
@@ -34,7 +34,7 @@ class NaiveDistributor(torch.nn.Module):
                 p.grad /= dist.get_world_size()
                 
 class FlatDistributor(torch.nn.Module):
-    def __init__(self, module: torch.nn.Module, device: str | None =None):
+    def __init__(self, module: torch.nn.Module):
         super().__init__()
         self.module = module
         if torch.cuda.is_available():
@@ -66,7 +66,7 @@ class FlatDistributor(torch.nn.Module):
             p.grad = g
             
 class OverlappingDistributor(torch.nn.Module):
-    def __init__(self, module: torch.nn.Module, device: str | None =None):
+    def __init__(self, module: torch.nn.Module):
         super().__init__()
         self.module = module
         if torch.cuda.is_available():
@@ -80,22 +80,22 @@ class OverlappingDistributor(torch.nn.Module):
         torch.nn.utils.vector_to_parameters(params, self.module.parameters())
         for name, param in self.module.named_parameters():
             if param.requires_grad:
-                handle = param.register_hook(self.make_hook(name))
+                post_handle = param.register_post_accumulate_grad_hook(self.make_post_hook(param))
     
-    def make_hook(self, param_name):
-        def hook(grad):
-            grad = grad.contiguous()
+    def make_post_hook(self, param):
+        def hook(param):
+            grad = param.grad.contiguous() / dist.get_world_size()
             self.async_handles.append(dist.all_reduce(grad, async_op=True))
-            return grad
-        return hook 
+            param.grad = grad 
             
+        return hook
     
     def forward(self, *inputs, **kwargs):
-        return self.module(*inputs)
+        return self.module(*inputs, **kwargs)
     def ddp_on_after_backward(self, optimizer):
-        if not self.debug_print_done:
-            print("Just waiting on sync")
-            self.debug_print_done = True
+        # if not self.debug_print_done:
+            # print("Just waiting on sync")
+            # self.debug_print_done = True
         self.finish_gradient_synchronization()
 
     def finish_gradient_synchronization(self):
@@ -118,21 +118,14 @@ class ShardedOptimizer(torch.optim.Optimizer):
         super().__init__(self.all_params, kwargs)
     
     @staticmethod
-    def get_param_idx(params, world_size = None):
-        if world_size: # debugging mode
-            is_debugging = True
-        else:
-            is_debugging = False
-            world_size = dist.get_world_size() # if world_size isn't None, I'm just testing this for debugging
+    def get_param_idx(params):
+        world_size = dist.get_world_size() # if world_size isn't None, I'm just testing this for debugging
         worker_idxs = [[] for _ in range(world_size)]
         worker_alloc: list[int] = [0  for _ in range(world_size)]
         param_summary = []
         for i, param in enumerate(params):
             param_summary.append((i, param.numel()))
         param_summary = sorted(param_summary, key=lambda v: v[1])
-        # print(f"{param_summary=}")
-        if is_debugging:
-            print(f"DEBUG: All parameters, sorted by numel (idx, numel) {param_summary}")
         while param_summary != []:
             pair = param_summary.pop()
             idx: int = pair[0]
@@ -141,20 +134,15 @@ class ShardedOptimizer(torch.optim.Optimizer):
             min_idx: int = worker_alloc.index(freest_worker)
             worker_idxs[min_idx].append(idx)
             worker_alloc[min_idx] += numel
-        if is_debugging:
-            print(f"DEBUG: Each worker's allocation: {worker_alloc}")
-        # print(worker_idxs, worker_alloc, "HERE CTRL+F")
         return worker_idxs # the indices worker with rank `rank` are responsible for
     
     def step(self, closure=None, **kwargs):
         self.optim.step(closure=closure, **kwargs)
         for rank, param_idxs in enumerate(self.sharded_idxs):
-            # print(param_idxs)
             for param_idx in param_idxs:
-                # print(f"Communicating {param_idx}: source: {rank}, self: {self.rank}")
                 with torch.no_grad():
                     dist.broadcast(self.all_params[param_idx], src=rank)
-        dist.barrier()
+
     def add_param_group(self, param_group: dict[str, Any]):
         super().add_param_group(param_group)
         responsible_group = {"params": []}
