@@ -1,5 +1,9 @@
 import torch
 import torch.distributed as dist
+from typing import Any, Type
+from torch.optim import Optimizer
+
+
 
 class NaiveDistributor(torch.nn.Module):
     def __init__(self, module: torch.nn.Module, device: str | None =None):
@@ -80,8 +84,6 @@ class OverlappingDistributor(torch.nn.Module):
     
     def make_hook(self, param_name):
         def hook(grad):
-            # if dist.get_rank() == 0:
-                # print(f"Syncing {param_name}") # don't do this, there's too many parameters
             grad = grad.contiguous()
             self.async_handles.append(dist.all_reduce(grad, async_op=True))
             return grad
@@ -100,3 +102,68 @@ class OverlappingDistributor(torch.nn.Module):
         for handle in self.async_handles:
             handle.wait()
         self.async_handles.clear()
+        
+class ShardedOptimizer(torch.optim.Optimizer):
+    def __init__(self, params, optimizer_cls: Type[Optimizer], **kwargs: Any):
+        all_params: list[torch.nn.Parameter] = list(params)
+        self.all_params = all_params
+        self.rank = dist.get_rank()
+        self.sharded_idxs = ShardedOptimizer.get_param_idx(self.all_params)
+        self.responsible_params: list[torch.nn.Parameter] = [self.all_params[i] for i in self.sharded_idxs[self.rank]]
+
+        self.optim = None
+        self.optimizer_cls = optimizer_cls
+        self.kwargs = kwargs
+      
+        super().__init__(self.all_params, kwargs)
+    
+    @staticmethod
+    def get_param_idx(params, world_size = None):
+        if world_size: # debugging mode
+            is_debugging = True
+        else:
+            is_debugging = False
+            world_size = dist.get_world_size() # if world_size isn't None, I'm just testing this for debugging
+        worker_idxs = [[] for _ in range(world_size)]
+        worker_alloc: list[int] = [0  for _ in range(world_size)]
+        param_summary = []
+        for i, param in enumerate(params):
+            param_summary.append((i, param.numel()))
+        param_summary = sorted(param_summary, key=lambda v: v[1])
+        # print(f"{param_summary=}")
+        if is_debugging:
+            print(f"DEBUG: All parameters, sorted by numel (idx, numel) {param_summary}")
+        while param_summary != []:
+            pair = param_summary.pop()
+            idx: int = pair[0]
+            numel: int = pair[1]
+            freest_worker = min(worker_alloc)
+            min_idx: int = worker_alloc.index(freest_worker)
+            worker_idxs[min_idx].append(idx)
+            worker_alloc[min_idx] += numel
+        if is_debugging:
+            print(f"DEBUG: Each worker's allocation: {worker_alloc}")
+        # print(worker_idxs, worker_alloc, "HERE CTRL+F")
+        return worker_idxs # the indices worker with rank `rank` are responsible for
+    
+    def step(self, closure=None, **kwargs):
+        self.optim.step(closure=closure, **kwargs)
+        for rank, param_idxs in enumerate(self.sharded_idxs):
+            # print(param_idxs)
+            for param_idx in param_idxs:
+                # print(f"Communicating {param_idx}: source: {rank}, self: {self.rank}")
+                with torch.no_grad():
+                    dist.broadcast(self.all_params[param_idx], src=rank)
+        dist.barrier()
+    def add_param_group(self, param_group: dict[str, Any]):
+        super().add_param_group(param_group)
+        responsible_group = {"params": []}
+        for param in param_group["params"]:
+            if any(param is t for t in self.responsible_params):
+                responsible_group["params"].append(param)
+        if self.optim is None:
+            self.optim = self.optimizer_cls([responsible_group], **self.kwargs)
+            del self.kwargs, self.optimizer_cls
+        else:
+            self.optim.add_param_group(responsible_group)
+        # self.param_groups.append(param_group)

@@ -9,7 +9,7 @@ try:
 except:
     pass
 
-from cs336_systems.ddp import NaiveDistributor, OverlappingDistributor
+from cs336_systems.ddp import NaiveDistributor, OverlappingDistributor, ShardedOptimizer
 
 def get_flashattention_autograd_function_pytorch() -> type:
     """
@@ -57,7 +57,7 @@ def get_ddp(module: torch.nn.Module) -> torch.nn.Module:
         Instance of a DDP class.
     """
     # For example: return DDP(module)
-    return NaiveDistributor(module)
+    return OverlappingDistributor(module)
 
 
 def ddp_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
@@ -139,4 +139,4 @@ def get_sharded_optimizer(params, optimizer_cls: type[torch.optim.Optimizer], **
     Returns:
         Instance of sharded optimizer.
     """
-    raise NotImplementedError
+    return ShardedOptimizer(params, optimizer_cls, **kwargs)
