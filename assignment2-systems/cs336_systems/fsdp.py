@@ -16,10 +16,9 @@ class FSDP(nn.Module):
         self.compute_dtype = compute_dtype
         hooked_on_modules: list[nn.Module] = []
         self.non_sharded_modules = []
-        
+        self.async_handles = []
         for module in self.module.modules():
             if isinstance(module, compatible_modules):
-                # COMMUNICATION HERE 
                 self.shard(module)
                 hooked_on_modules.append(module)
             else:
@@ -38,8 +37,10 @@ class FSDP(nn.Module):
         l_last.register_full_backward_pre_hook(self.load_layer(l_last))
         for l1, l2 in pairwise(hooked_on_modules):
             l1.register_forward_pre_hook(self.load_layer(l2)) # load next modules weight before current forward
+            l1.register_forward_pre_hook(lambda _0,_1: self.sync_weights())
             l1.register_forward_hook(self.unload_layer(l1)) # unload this modules weight after forward
     
+            l1.register_full_backward_pre_hook(lambda _0,_1: self.sync_weights()) # I tried this both after and before the other hook
             l2.register_full_backward_pre_hook(self.load_layer(l1))
             for param in l2.parameters():
                 if param.requires_grad:
@@ -79,7 +80,7 @@ class FSDP(nn.Module):
                 for parameter in module.parameters():
                     weights = torch.cat([torch.zeros_like(self.shard_dict[parameter]) for _ in range(dist.get_world_size())]).to(self.compute_dtype)
                     cast_shard = self.shard_dict[parameter].to(self.compute_dtype)
-                    dist.all_gather_into_tensor(weights, cast_shard)
+                    self.async_handles.append(dist.all_gather_into_tensor(weights, cast_shard, async_op=True))
                     if self.pad_len[parameter] != 0:
                         parameter.data = weights[:-self.pad_len[parameter], ...]
                     else:
@@ -91,7 +92,7 @@ class FSDP(nn.Module):
             for parameter in module.parameters():
                 cast_shard = self.shard_dict[parameter]
                 weights = torch.cat([torch.zeros_like(cast_shard) for _ in range(dist.get_world_size())])
-                dist.all_gather_into_tensor(weights, cast_shard)
+                dist.all_gather_into_tensor(weights, cast_shard) # this one is only used by some test, so it doesn't need to be async
                 if self.pad_len[parameter] != 0:
                     parameter.data = weights[:-self.pad_len[parameter], ...]
                 else:
@@ -130,7 +131,12 @@ class FSDP(nn.Module):
                     parameter.data = self.shard_dict[parameter]
         return state_dict    
     
+    def sync_weights(self):
+        for handle in self.async_handles:
+            handle.wait()
+        self.async_handles.clear()
+    
     def finish_gradient_synchronization(self):
-        pass
+        self.sync_weights()
         
         
