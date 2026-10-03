@@ -805,6 +805,45 @@ Each of the results screenshots (in the results folder under their corresponding
 
 Optimizer State Sharding (15 points)
 
+# optimizer_state_sharding_accounting
+a. Claude ran:
+`cd /Users/josephvero/Developer/cs336 && modal run scripts/modal_run.py --script cs336_systems/mem_profile_sharded.py --gpu B200:2 `
+┌────────────────────┬────────────┬─────────────┬────────────┐
+│                    │ After init │ Before step │ After step │
+├────────────────────┼────────────┼─────────────┼────────────┤
+│ Sharded (per rank) │ 12.82 GiB  │ 25.60 GiB   │ 44.77 GiB  │ optimizer accounts for 19.17 GiB
+├────────────────────┼────────────┼─────────────┼────────────┤
+│ Unsharded          │ 12.82 GiB  │ 25.60 GiB   │ 63.99 GiB  │ optimizer accounts for 38.3 GiB
+└────────────────────┴────────────┴─────────────┴────────────┘
+
+both sharded and unsharded match about 3.4B parameters, pre-optimizer step doubles the amount of allocation to about 6.8B floats (3.4B parameters, 3.4B grads), after the optimizer step, sharded allocates 19.17 GiB -> 5.1B floats, and unsharded 38.3 GiB -> 10.2B floats. 10.2B from AdamW / 3.4B params = 3 floats per parameter, typically AdamW stores 2 moments per parameter, so there's a third value that's allocated both in sharded and unsharded. In the "happy path" of AdamW, there's one extra allocation per parameter:
+Line 791  exp_avg_sq_sqrt = torch._foreach_sqrt(device_exp_avg_sqs), to test this, I ran it with a fused kernel (AdamW(fused=True)). The command stayed the same as above, and after running that I reverted the kwarg to defaults, so I don't corrupt future measurements.
+`cd /Users/josephvero/Developer/cs336 && modal run scripts/modal_run.py --script cs336_systems/mem_profile_sharded.py --gpu B200:2 `
+
+┌────────────────────┬────────────┬─────────────┬────────────┐
+│                    │ After init │ Before step │ After step │
+├────────────────────┼────────────┼─────────────┼────────────┤
+│ Sharded (per rank) │ 12.82 GiB  │ 25.60 GiB   │ 38.36 GiB  │ Optimizer accounts for 12.76GiB = about 1 float per model param per shard
+├────────────────────┼────────────┼─────────────┼────────────┤
+│ Unsharded          │ 12.82 GiB  │ 25.60 GiB   │ 51.18 GiB  │ Optimizer accounts for 25.58GiB = about 2 float per model param
+└────────────────────┴────────────┴─────────────┴────────────┘
+b. 
+`modal run scripts/modal_run.py --script cs336_systems/time_profile_sharded.py --gpu B200:2`
+
+┌─────────────────────────────────────┬─────────────────────┬─────────────────────┬──────────────────┬─────────────────────┐
+│                                     │       Forward       │   Backward + sync   │  Optimizer step  │   Full iteration    │
+├─────────────────────────────────────┼─────────────────────┼─────────────────────┼──────────────────┼─────────────────────┤
+│ DDP + AdamW (run 0 / 1 / 2)         │ 120.2 / 120.6 /     │ 199.0 / 199.6 /     │ 66.9 / 66.9 /    │ 398.5 / 400.7 /     │
+│                                     │ 120.8               │ 202.3               │ 66.8             │ 403.8               │
+├─────────────────────────────────────┼─────────────────────┼─────────────────────┼──────────────────┼─────────────────────┤
+│ DDP + ShardedOptimizer (run 0 / 1 / │ 120.8 / 117.6 /     │ 200.3 / 199.9 /     │ 58.1 / 58.3 /    │ 392.1 / 388.7 /     │
+│  2)                                 │ 122.4               │ 199.1               │ 58.2             │ 392.7               │
+├─────────────────────────────────────┼─────────────────────┼─────────────────────┼──────────────────┼─────────────────────┤
+│ DDP + AdamW, mean                   │ 120.6               │ 200.3               │ 66.9             │ 401.0               │
+├─────────────────────────────────────┼─────────────────────┼─────────────────────┼──────────────────┼─────────────────────┤
+│ DDP + ShardedOptimizer, mean        │ 120.3               │ 199.7               │ 58.2             │ 391.2               │
+└─────────────────────────────────────┴─────────────────────┴─────────────────────┴──────────────────┴─────────────────────┘
+The ShardedOptimizer, understandably, didn't change the Forward or Backward step timings meaningfully. The optimizer step itself went from 66.9 -> 58.2 = 8.7ms (13%) speedup. The full step, ultimately was sped up by 9.8ms, which is only a 2% total speedup.
 
 ## fsdp
 

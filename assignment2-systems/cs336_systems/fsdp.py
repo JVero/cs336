@@ -129,9 +129,6 @@ class FSDP(nn.Module):
                 for parameter in module.parameters():
                     parameter.data = self.shard_dict[parameter]
         return state_dict    
-            
-
-
     
     def finish_gradient_synchronization(self):
         pass
