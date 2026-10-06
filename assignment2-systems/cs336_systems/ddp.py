@@ -12,9 +12,7 @@ class NaiveDistributor(torch.nn.Module):
         if torch.cuda.is_available():
             device = f"cuda:{dist.get_rank()}"
             self.module.to(device)
-        params = torch.nn.utils.parameters_to_vector(self.module.parameters())
-        dist.broadcast(params, src=0)
-        torch.nn.utils.vector_to_parameters(params, self.module.parameters())
+        self.sync_weights()
         
     def forward(self, X):
         return self.module(X)
@@ -40,9 +38,7 @@ class FlatDistributor(torch.nn.Module):
         if torch.cuda.is_available():
             device = f"cuda:{dist.get_rank()}"
             self.module.to(device)
-        params = torch.nn.utils.parameters_to_vector(self.module.parameters())
-        dist.broadcast(params, src=0)
-        torch.nn.utils.vector_to_parameters(params, self.module.parameters())
+        self.sync_weights()
         
     def forward(self, X):
         return self.module(X)
@@ -74,13 +70,12 @@ class OverlappingDistributor(torch.nn.Module):
             self.module.to(device)
         self.hook_handles = []
         self.async_handles = []
-        self.debug_print_done = False
         params = torch.nn.utils.parameters_to_vector(self.module.parameters())
         dist.broadcast(params, src=0)
         torch.nn.utils.vector_to_parameters(params, self.module.parameters())
-        for name, param in self.module.named_parameters():
+        for _, param in self.module.named_parameters():
             if param.requires_grad:
-                post_handle = param.register_post_accumulate_grad_hook(self.make_post_hook(param))
+                param.register_post_accumulate_grad_hook(self.make_post_hook(param))
     
     def make_post_hook(self, param):
         def hook(param):
@@ -93,9 +88,6 @@ class OverlappingDistributor(torch.nn.Module):
     def forward(self, *inputs, **kwargs):
         return self.module(*inputs, **kwargs)
     def ddp_on_after_backward(self, optimizer):
-        # if not self.debug_print_done:
-            # print("Just waiting on sync")
-            # self.debug_print_done = True
         self.finish_gradient_synchronization()
 
     def finish_gradient_synchronization(self):
