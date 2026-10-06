@@ -101,7 +101,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `ddp_overlap_individual_parameters` DDP with Overlapping Individual Parameters (5 pts)
 - [x] `ddp_overlap_individual_parameters_benchmarking` DDP Overlapping Individual Parameters Benchmarking (1 pt)
 - [x] `optimizer_state_sharding` Optimizer State Sharding (15 pts)
-- [ ] `optimizer_state_sharding_accounting` Optimizer State Sharding Accounting (5 pts)
+- [x] `optimizer_state_sharding_accounting` Optimizer State Sharding Accounting (5 pts)
 - [x] `fsdp` Fully-Sharded Data Parallel (15 pts)
 - [ ] `fsdp_accounting` FSDP Accounting (5 pts)
 - [ ] `alternate_ring_all_reduce` Alternate ring all-reduce (1 pt)

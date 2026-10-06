@@ -845,6 +845,8 @@ b.
 └─────────────────────────────────────┴─────────────────────┴─────────────────────┴──────────────────┴─────────────────────┘
 The ShardedOptimizer, understandably, didn't change the Forward or Backward step timings meaningfully. The optimizer step itself went from 66.9 -> 58.2 = 8.7ms (13%) speedup. The full step, ultimately was sped up by 9.8ms, which is only a 2% total speedup.
 
+c. Based on the illustration of Figure 1, it seems like the authors balance ZeRO's distribution of responsible parameters equally amongst the workers. They allocate a contiguous chunk of memory for each worker. This differs from my implementation as mine sorts the parameters by number of weights, and then greedily allocates them to the workers, which is easier to distribute the weights of, but its more likely to get unbalanced distributions of weights, when there are especially large modules. Communication-wise, my implementation of ShardedOptimizer communicates 3phi parameters while ZeRO communicates 2phi.  FSDP is the more faithful recreation of Pos+g+p
+
 ## fsdp
 
 Fully-Sharded Data Parallel (15 points)
