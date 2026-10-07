@@ -858,6 +858,23 @@ FSDP Accounting (5 points)
 a. Given the accounting done in optimizer_state_sharding_accounting, I'd expect the peak memory savings to come from 3 distinct places. The weights, gradients, and optimizer state are all chunked such that each worker is only responsible for approximately 1/num_workers of it. Using the memory profiling from earlier: 12.82 GiB  │ 25.60 GiB   │ 44.77 GiB
 25.60 GiB - 12.82 GiB = 12.78 GiB is the amount from the ShardedOptimizer's gradients, so we can assume that's the amount for the raw weights as well (the remaining 0.02 must be stray allocations from other things + rounding errors). 12.78 for both the weights and gradients should be approximately cut in half, at the cost of some additional overhead keeping track of the shards in the hashmap. Before optimizer.step, I'd expect to measure memory usage of 12.82 GiB instead of 25.60 GiB. Using the unfused AdamW optimizer, that should still allocate the same amount per shard, so I'd expect the peak measurement to be 12.78 below the measured peak of 44.77, so approximately 32GiB.
 
+  rank 0 step 2 post-init memory: 27457510912 = 25.57 GiB
+  rank 1 step 2 post-init memory: 27457510912
+  rank 1 step 2 sharded Pre optimizer step: 48596822528 = 45.26 GiB
+  rank 0 step 2 sharded Pre optimizer step: 48596822528
+
+  rank 0 step 2 sharded Post optimizer step: 48596822528 = 45.26 GiB
+  rank 1 step 2 sharded Post optimizer step: 48596822528
+
+rank 1 step 0 post-init memory: 20607852032 = 19.19 GiB
+rank 1 step 0 sharded Pre optimizer step: 41794349568 = 38.92 GiB
+rank 1 step 0 sharded Post optimizer step: 41794349568 = 38.92 GiB
+
+rank 1 step 1 post-init memory: 20710612480 = 19.29 GiB 
+rank 1 step 1 sharded Pre optimizer step: 41822112256 = 38.95 GiB
+rank 1 step 1 sharded Post optimizer step: 41822112256 = 38.95 GiB
+
+B. The communication does not finish in time for the forward pass without the waiting. This is exemplified in the /Users/josephvero/Developer/cs336/assignment2-systems/results/fsdp_profile3/all_gather_vs_compute.png screenshot. This is because the matmul, on average, don't take as long as the all-gather. When you look at timeline, it shows that approximately 49.6% of the time in is from the all_gather, and 37.1% is GEMM. It should be noted that the all_gather time includes waiting for the other rank, so it is an upper bound
 ## alternate_ring_all_reduce
 
 Alternate ring all-reduce (1 point)

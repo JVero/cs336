@@ -103,7 +103,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `optimizer_state_sharding` Optimizer State Sharding (15 pts)
 - [x] `optimizer_state_sharding_accounting` Optimizer State Sharding Accounting (5 pts)
 - [x] `fsdp` Fully-Sharded Data Parallel (15 pts)
-- [ ] `fsdp_accounting` FSDP Accounting (5 pts)
+- [x] `fsdp_accounting` FSDP Accounting (5 pts)
 - [ ] `alternate_ring_all_reduce` Alternate ring all-reduce (1 pt)
 - [ ] `data_parallel_calcs` Data parallel calculations (3 pts)
 - [ ] `fsdp_calcs` Fully sharded data parallel calculations (3 pts)
