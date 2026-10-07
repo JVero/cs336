@@ -855,7 +855,8 @@ Fully-Sharded Data Parallel (15 points)
 ## fsdp_accounting
 
 FSDP Accounting (5 points)
-
+a. Given the accounting done in optimizer_state_sharding_accounting, I'd expect the peak memory savings to come from 3 distinct places. The weights, gradients, and optimizer state are all chunked such that each worker is only responsible for approximately 1/num_workers of it. Using the memory profiling from earlier: 12.82 GiB  │ 25.60 GiB   │ 44.77 GiB
+25.60 GiB - 12.82 GiB = 12.78 GiB is the amount from the ShardedOptimizer's gradients, so we can assume that's the amount for the raw weights as well (the remaining 0.02 must be stray allocations from other things + rounding errors). 12.78 for both the weights and gradients should be approximately cut in half, at the cost of some additional overhead keeping track of the shards in the hashmap. Before optimizer.step, I'd expect to measure memory usage of 12.82 GiB instead of 25.60 GiB. Using the unfused AdamW optimizer, that should still allocate the same amount per shard, so I'd expect the peak measurement to be 12.78 below the measured peak of 44.77, so approximately 32GiB.
 
 ## alternate_ring_all_reduce
 
