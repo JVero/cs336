@@ -16,10 +16,11 @@ class FSDP(nn.Module):
         self.compute_dtype = compute_dtype
         hooked_on_modules: list[nn.Module] = []
         self.non_sharded_modules = []
-        self.async_handles = []
+        self.async_handles: dict[torch.nn.Module, list[dist.Work | None]] = {}
         self.execution_order = []
         self.order_established = False
         for module in self.module.modules():
+            self.async_handles[module] = []
             if isinstance(module, compatible_modules):
                 self.shard(module)
                 hooked_on_modules.append(module)
@@ -55,7 +56,7 @@ class FSDP(nn.Module):
             last_chunk = torch.zeros_like(chunks[0])
             self.pad_len[parameter] = (chunks[0].shape[0] - chunks[-1].shape[0]) # torch.chunk splits by dim 0
             self.full_chunk_size[parameter] = chunks[0].shape
-            self.shard_dict[parameter] = chunks[dist.get_rank()]
+            self.shard_dict[parameter] = chunks[dist.get_rank()].clone()
 
             if dist.get_rank() == dist.get_world_size() - 1: # this is the last chunk (world_size 1 only has rank 0)
                 if self.pad_len[parameter] != 0:
@@ -80,7 +81,7 @@ class FSDP(nn.Module):
                     cast_shard = cast_shard.to(self.compute_dtype)
                     weights = weights.to(self.compute_dtype)
                 if async_op:
-                    self.async_handles.append(dist.all_gather_into_tensor(weights, cast_shard, async_op=async_op))
+                    self.async_handles[module].append(dist.all_gather_into_tensor(weights, cast_shard, async_op=async_op))
                 else:
                     dist.all_gather_into_tensor(weights, cast_shard, async_op=async_op)
                 if self.pad_len[parameter] != 0:
@@ -106,12 +107,12 @@ class FSDP(nn.Module):
             
     def gather_params_backward(self, current_module):
         if current_module == self.execution_order[-1]: # always load the last layer
-            self.load_mod_helper(current_module, True, False)
+            self.load_mod_helper(current_module, async_op=True, full_params=False)
         if current_module == self.execution_order[0]: # no-op
             return
         module_to_load_idx = self.execution_order.index(current_module) - 1
         module_to_load = self.execution_order[module_to_load_idx]
-        self.load_mod_helper(module_to_load, True, False)
+        self.load_mod_helper(module_to_load, async_op=True, full_params=False)
         
     def reduce_scatter_unload(self, _: nn.Parameter):
         def hook(param: nn.Parameter) -> None:
@@ -147,13 +148,19 @@ class FSDP(nn.Module):
                     parameter.data = self.shard_dict[parameter]
         return state_dict    
     
-    def sync_weights(self):
-        for handle in self.async_handles:
+    def sync_weights(self, module: torch.nn.Module):
+        for i, handle in enumerate(self.async_handles[module]):
+            if handle is None:
+                continue
             handle.wait()
-        self.async_handles.clear()
+        self.async_handles[module].clear()
     
     def finish_gradient_synchronization(self):
-        self.sync_weights()
+        for handles in self.async_handles.values():
+            for handle in handles:
+                if handle is None:
+                    continue
+                handle.wait()
         
     def load_layer_hook(self, l1: torch.nn.Module):
         l1.register_forward_pre_hook(lambda l, _: self.gather_params(l, async_op=True))
@@ -162,10 +169,10 @@ class FSDP(nn.Module):
         l1.register_full_backward_pre_hook(lambda _1, _2: self.gather_params_backward(_1))
 
     def backwards_sync_weights_hook(self, l1: torch.nn.Module):
-        l1.register_full_backward_pre_hook(lambda _0,_1: self.sync_weights()) # I tried this both after and before the other hook
+        l1.register_full_backward_pre_hook(lambda _0,_1: self.sync_weights(l1)) # I tried this both after and before the other hook
 
     def sync_weights_hook(self, l1: torch.nn.Module):
-        l1.register_forward_pre_hook(lambda _0, _1: self.sync_weights())
+        l1.register_forward_pre_hook(lambda _0, _1: self.sync_weights(l1))
         
     def unload_layer_hook(self, l1: torch.nn.Module):
         l1.register_forward_hook(self.unload_module(l1))

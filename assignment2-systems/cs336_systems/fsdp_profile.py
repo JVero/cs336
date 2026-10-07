@@ -8,14 +8,15 @@ from cs336_systems.fsdp import FSDP
 from cs336_basics.nn_utils import cross_entropy
 
 import nvtx 
-
+import warnings
+warnings.filterwarnings("ignore", message="Full backward hook is firing")
 
 def setup(rank, world_size, backend):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "29500"
     dist.init_process_group(backend, rank=rank, world_size=world_size)
     
-def warmup(model: torch.nn.Module, X: torch.Tensor, optimizer: torch.optim.Optimizer, n_steps=3):
+def warmup(model: FSDP, X: torch.Tensor, optimizer: torch.optim.Optimizer, n_steps=3):
     for _ in range(n_steps):
         y = model(X)
         y.sum().backward()
@@ -42,7 +43,8 @@ def prof_test(rank, world_size, backend, reading):
 
     optim = torch.optim.AdamW(model.parameters())
     warmup(model, X.clone(), optim)
-    
+    if torch.cuda.is_available():
+        torch.cuda.reset_max_memory_allocated(device)
     with nvtx.annotate("Full Step"):
         if torch.cuda.is_available():
             print(f"rank {dist.get_rank()} step {reading} post-init memory: {torch.cuda.max_memory_allocated(device)}")        
@@ -68,24 +70,3 @@ if __name__ == "__main__":
     backend = "nccl" if torch.cuda.is_available() else "gloo"
     for reading in range(3):
         mp.spawn(prof_test, (world_size, backend, reading), world_size, join=True)
-        # if backend == "nccl":
-        #     model = BasicsTransformerLM(vocab_size=10000, context_length=512, d_model=2560,
-        #             num_layers=32, num_heads=32, d_ff=10240)
-        #     X = torch.randint(0, 10000, (1, 512,))
-        #     Y = torch.randint(0, 10000, (1, 512,))
-        # else:
-        #     model = BasicsTransformerLM(10, 10, 10, 10, 1, 10)
-        #     X = torch.randint(0, 9, (1, 10))
-        #     Y = torch.randint(0, 9, (1, 10))
-        # optim = torch.optim.AdamW(model.parameters())
-        # if torch.cuda.is_available():
-        #     print(f"serial step {reading} post-init memory: {torch.cuda.max_memory_allocated()}")     
-        # y_pred = model(X)
-        # loss = cross_entropy(y_pred, Y)
-        # loss.backward()
-        # if torch.cuda.is_available():
-        #     print(f"step {reading} serial Pre optimizer step: {torch.cuda.max_memory_allocated()}")    
-        # optim.step()
-        # if torch.cuda.is_available():
-        #     print(f"step {reading} serial Post optimizer step: {torch.cuda.max_memory_allocated()}")    
-        #     torch.cuda.reset_max_memory_allocated()
