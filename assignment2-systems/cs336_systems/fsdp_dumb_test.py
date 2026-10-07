@@ -28,5 +28,6 @@ def fsdp_test(rank, world_size):
             print( (y_fsdp - y_normal).abs().max()) # tensor(3.4910, grad_fn=<MaxBackward1>)
         
 if __name__ == "__main__":
-    mp.spawn(fsdp_test, (4,), nprocs=4, join=True)
+    world_size = 2
+    mp.spawn(fsdp_test, (2,), nprocs=2, join=True)
     
