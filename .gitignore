@@ -41,3 +41,6 @@ assignment1-basics/*_vocab*.json
 assignment1-basics/*_merges*.json
 assignment2-systems/*/*.csv
 !assignment2-systems/results/bench_log.csv
+
+# Parsed handout text (scripts/parse_handouts.sh)
+handouts/
