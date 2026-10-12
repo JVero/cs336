@@ -878,12 +878,21 @@ B. The communication does not finish in time for the forward pass without the wa
 ## alternate_ring_all_reduce
 
 Alternate ring all-reduce (1 point)
-
+ Each step they send a full tensor, so each step would require sending S bytes. Now assuming egress bandwidth of W bytes/second, each step would take S/W seconds. the units check out. N-1 steps, each taking would be S(N-1)/W seconds.
 
 ## data_parallel_calcs
 
 Data parallel calculations (3 points)
+a. The total number of FLOPs do not change with data parallelism. The question does not specify per-device. A backward pass requires 12 * B * D * Dff FLOPs in matmuls, regardless of what N_dp is.
+b. Ok so if I'm calculating the total communication time, I said before that the time for a matrix of size S is  2(N-1)(S)/(N * W)  The fact that it's 3 matrices doesn't change anything, right? I could just tile it so its 1 big matrix if the number of calls was an issue, but if it requires all_reducing 3 (D,Dff) matrices, then s = 3 DDff, so the communication time would be , so 2*2(N_dp - 1) (3DD_ff)/(N_dp * W), independent of batch size.
+c. per device, the concurrent flops being 12 * B * D * Dff/(N_dp*C) = 2*2(N_dp - 1) (3DD_ff)/(N_dp * W), simplifying:
+(12 * B * D * Dff/N_dp)/C = 12(N_dp - 1) (DD_ff)/(N_dp * W)
+  B D Dff / (N_dpC) = (N_dp - 1) D D_ff / (N_dp * W)
+  B/ (N_dpC) = (N_d - 1) / (N_dp * W)
+  B / C= (N_dp - 1) / W
+  B W / C + 1 = N_dp
 
+  When left is equal to right, you spend equal times on compute and communication, so when N_dp > (B W) / C + 1, you spend more time on communication than compute
 
 ## fsdp_calcs
 
