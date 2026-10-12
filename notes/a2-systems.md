@@ -897,8 +897,16 @@ c. per device, the concurrent flops being 12 * B * D * Dff/(N_dp*C) = 2*2(N_dp -
 ## fsdp_calcs
 
 Fully sharded data parallel calculations (3 points)
+a. The number of FLOPs stays the same in FSDP, so the answers are the same as before: 
+backward pass - 12 B D Dff FLOPs shared amongst all the devices (12 B D Dff / Nfsdp per device)
+forward pass - 6 B D Dff FLOPs shared amonggst all the devices (6 B D Dff / Nfsdp per device)
 
+b. 
+In the forward pass, there are a total of 3 all-gathers: 1 for each weight matrix W1, W2, W3, each taking 2 x D x Dff bytes. Therefore the forward pass's communication time would be [3(Nfsdp-1)/Nfsdp * (2 x D x Dff)/W]
+In the backwards pass, there are a total of 3 all-gathers, and 3 reduce-scatters, one for each weight matrix W1, W2, W3. Each of those has DxDff weights, which take 2 x D x Dff bytes. The formula for communication time is the same for all-gather and reduce-scatter, so the total communication time for the backward pass is [6 (Nfsdp - 1) / (Nfsdp) * (2 D Dff)/W] seconds
 
+C. Setting the compute equal to the communication time, they are equal when  6BDDff/(Nfsdp C) = 6(Nfsdp-1)/Nfsdp * DDff/W. Therefore, when Nfsdp > 1 + (BW/C), communication takes more time than the computation.
+The only difference between forward and backward is a factor of 2 that's on both sides of the equation, so the inequality is the same: when Nfsdp > 1 + (BW/C) in backwards, communication dominates.
 ## tp_calcs
 
 Tensor parallel calculations (4 points)
