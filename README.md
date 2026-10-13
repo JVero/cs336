@@ -107,8 +107,8 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `alternate_ring_all_reduce` Alternate ring all-reduce (1 pt)
 - [x] `data_parallel_calcs` Data parallel calculations (3 pts)
 - [x] `fsdp_calcs` Fully sharded data parallel calculations (3 pts)
-- [ ] `tp_calcs` Tensor parallel calculations (4 pts)
-- [ ] `fsdp_tp_calcs` 2D parallelism calculations (6 pts)
+- [x] `tp_calcs` Tensor parallel calculations (4 pts)
+- [x] `fsdp_tp_calcs` 2D parallelism calculations (6 pts)
 - [ ] `leaderboard` Leaderboard: fastest training step (10 pts)
 
 ### Assignment 3: Scaling

@@ -910,12 +910,57 @@ The only difference between forward and backward is a factor of 2 that's on both
 ## tp_calcs
 
 Tensor parallel calculations (4 points)
+a. 
+dy = given
+dyi = dy 
+dzi (B, Dff/Ntp) = dyi (B, D) W3iT (D, Dff/Ntp)
+dW3i (Dff/Ntp, D) = ziT (Dff/Ntp, B) dyi (B, D)
+dfi (B, Dff/Ntp) = dzi (B, Dff/Ntp) * x2i (B, Dff/Ntp)
+dW2i (D, Dff/Ntp)= xt (D, B) dx2i (B, Dff/Ntp)
+dW1i (D, Dff/Ntp)= xt (D, B) dx1i (B, Dff/Ntp)
+dx1i (B, Dff/Ntp) = dfi (B, Dff/Ntp) * f'(x1(i))
+dx2i (B, Dff/Ntp) = dzi (B, Dff/Ntp) * f(x1i) (B, Dff/Ntp)
+dxi (B, D) = dx1i (B, Dff/Ntp) W1iT (Dff/Ntp, D) + dx2i (B, Dff/Ntp) W2iT (Dff/Ntp, D)
+dx (B, D)= all-reduce(dxi)  <- communication 2 (Ntp - 1) / N * 2 * B * D / W seconds = 4 (Ntp-1)BD/(NtpW)
 
+b/c. Forward pass
+Forward pass involves step 47,48,50. 6B D Dff/Ntp of compute, 2(Ntp-1)/Ntp * (2BD)/W communication = 4(Ntp-1)BD/(NtpW)
+Using the rule that compute in backwards is typically 2x forward, 12B D Dff/Ntp of compute, but the communication is the same (4(Ntp-1)BD/(NtpW)). The compute calculation is verified by the enumerated matmuls in part A.
+
+d.
+Backward: 12BD Dff/(Ntp C) < 4 (Ntp - 1)/Ntp * BD/W
+-> 1 + 3Dff W / C < Ntp     is when compute is overshadowed by communication
+Forward: 6 BD Dff/(Ntp C) < 4 (Ntp - 1)/Ntp * BD/W
+-> 1 + 3/2 Dff W/C < Ntp    is when compute is overshadowed by communication
 
 ## fsdp_tp_calcs
 
 2D parallelism calculations (6 points)
-
+a. Following the steps in equations 52-59, equations 55,56,58 are the matmuls
+55 and 56: 2B D Dff/(Nfsdp * Ntp)
+58: 2B Dff D / (Ntp * Nfsdp)
+total FLOPs = 6B D Dff/(Nfsdp * Ntp) 
+b. Communication happens in steps 52, 53, 54, and 59
+52,53,54: (Nfsdp-1)/Nfsdp * 2D Dff/(W Ntp)
+59: 2(Ntp - 1)/Ntp * 2BD/(W Nfsdp)
+Total communication time
+max(3 * (Nfsdp-1)/Nfsdp * 2D Dff/(W Ntp),  2(Ntp - 1)/Ntp * 2BD/(W Nfsdp))
+three FSDP all-gathers of the TP-sharded weights overlap with one TP all-reduce of the batch-sharded output.
+c. Solving for Nfsdp, you get Nfsd > 1 + BW/C is when its communication-bound
+   Solving for Ntp, you get Ntp > 1 + 3 Dff W /(2C)
+   Because each N can be solved for explicitly, you can increase each of them without impacting the other, directly.
+Their product N <= 1 + 3W^2 B Dff/(2C^2) + 3Dff W / (2C) + BW/C . When the product of the Nfsdp and Ntp are below that bound, it is still compute-bound rather than communication-bound
+d. When the steps can't be interwoven, the optima for Nfsdp and Ntp are 
+  Nfsdp = [3WBDff + 3CDff + 2BC]/[6CDff]
+  Ntp = [3WBDff + 3CDff + 2BC]/[4BC]
+  
+  Their product's bound is is 
+    N <= [3WBDff + 3CDff + 2BC]^2/[24BC^2Dff]
+Expanding this:
+N <= [9W^2B^2Dff^2 + 18WBCDff^2 + 12WB^2CDff + 9C^2Dff^2 + 4B^2C^2 + 12BC^2Dff]/[24BC^2Dff]
+or 
+N <= 3W^2BDff/[8C^2] + 3WDff/[4C] + WB/[2C] + 3Dff/[8B] + B/[6Dff] + 1/2
+These don't prevent floating point numbers or even prime products, but this inequality is basically a starting point to build layout candidates.
 
 ## leaderboard
 
