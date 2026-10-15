@@ -113,7 +113,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 
 ### Assignment 3: Scaling
 
-- [ ] `chinchilla_isoflops` IsoFLOPs scaling laws (5 pts)
+- [x] `chinchilla_isoflops` IsoFLOPs scaling laws (5 pts)
 - [ ] `scaling_laws` Constructing scaling laws leaderboard (50 pts)
 
 ### Assignment 4: Data
