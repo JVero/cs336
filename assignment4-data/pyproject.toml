@@ -33,6 +33,7 @@ dependencies = [
     "warcio>=1.8.1",
     "pytest-timeout>=2.4.0",
     "torch>=2.11.0",
+    "matplotlib>=3.11.2",
 ]
 
 [tool.setuptools.packages.find]

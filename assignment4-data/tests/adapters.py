@@ -4,13 +4,14 @@ import os
 from typing import Any
 
 
-
+from scripts.extract_text import extract_text_from_html
+from scripts.predict_language import predict
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
-    raise NotImplementedError
+    return extract_text_from_html(html_bytes)
 
 
 def run_identify_language(text: str) -> tuple[Any, float]:
-    raise NotImplementedError
+    return predict(text)
 
 
 def run_mask_emails(text: str) -> tuple[str, int]:
