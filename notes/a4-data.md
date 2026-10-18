@@ -106,8 +106,17 @@ After looking at the retention curves at various thresholds (figures/retention_c
 ## mask_pii
 
 Personally identifiable information (3 points)
+a,b,c. Implemented and tests pass (no IPV6, lots of false positives because my phone number pattern matching doesn't only match real phone numbers)
 
+d. Issues that might arise downstream in a language model when these filters are applied are that the model won't know what the explicit structure of an email address, phone number, or ip address is. There's also the harmless non PII stuff like the local router = 192.168.1.1 which get redacted, 555 numbers might get filtered. The first instinct I would have to mitigate this would be to introduce the model to a whitelist of non-specific values that are generic enough to "leak".
 
+e. Below are the only mistakes from the 20 records I sampled. I'd argue the false negative is worse than the false positive because you're better off erring on the side of not leaking PII
+False positive: 
+Masked: "|||PHONE_NUMBER|||-AsmyODAfapufbDade4IATxGjmbEoCvmrh9jOWTa" (the true value is "1563679051")
+False negative:
+Masked: "Telefon 0711-47060191  • |||EMAIL_ADDRESS|||"
+True: "Telefon 0711-47060191 • infos@wilih.de"
+It catches a correct email, but it doesn't filter the phone number because this isn't the USA format.
 ## harmful_content
 
 Harmful content (6 points)

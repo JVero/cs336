@@ -6,6 +6,8 @@ from typing import Any
 
 from scripts.extract_text import extract_text_from_html
 from scripts.predict_language import predict
+from scripts.mask_pii import mask_email, mask_phone, mask_ip
+
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
     return extract_text_from_html(html_bytes)
 
@@ -15,15 +17,15 @@ def run_identify_language(text: str) -> tuple[Any, float]:
 
 
 def run_mask_emails(text: str) -> tuple[str, int]:
-    raise NotImplementedError
+    return mask_email(text)
 
 
 def run_mask_phone_numbers(text: str) -> tuple[str, int]:
-    raise NotImplementedError
+    return mask_phone(text)
 
 
 def run_mask_ips(text: str) -> tuple[str, int]:
-    raise NotImplementedError
+    return mask_ip(text)
 
 
 def run_classify_nsfw(text: str) -> tuple[Any, float]:

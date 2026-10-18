@@ -121,7 +121,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `look_at_cc` Looking at Common Crawl (4 pts)
 - [x] `extract_text` HTML to text conversion (3 pts)
 - [x] `language_identification` Language identification (6 pts)
-- [ ] `mask_pii` Personally identifiable information (3 pts)
+- [x] `mask_pii` Personally identifiable information (3 pts)
 - [ ] `harmful_content` Harmful content (6 pts)
 - [ ] `gopher_quality_filters` Gopher quality filters (3 pts)
 - [ ] `quality_classifier` Quality classifier (15 pts)
