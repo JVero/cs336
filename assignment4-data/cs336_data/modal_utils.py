@@ -4,7 +4,7 @@ import modal
 
 from cs336_data.common import MODAL_SHARED_PATH
 
-SUNET_ID = "TODO"  # NOTE: modal_utils.py should remain effectively unchanged other than adding your SUNET_ID
+SUNET_ID = "jvero"  # NOTE: modal_utils.py should remain effectively unchanged other than adding your SUNET_ID
 if SUNET_ID == "TODO":
     raise ValueError("Please set SUNET_ID in cs336_data/modal_utils.py before running Modal jobs.")
 
@@ -13,7 +13,7 @@ if SUNET_ID == "TODO":
 app = modal.App(f"data-{SUNET_ID}")
 data_volume = modal.Volume.from_name(f"data-{SUNET_ID}", create_if_missing=True, version=2)
 shared_data_volume = modal.Volume.from_name(
-    "a4-shared-data", create_if_missing=True, version=2, environment_name="cs336-shared-data"
+    "a4-shared-data", create_if_missing=True, version=2# , environment_name="cs336-shared-data"
 )
 
 
