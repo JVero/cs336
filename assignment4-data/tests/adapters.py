@@ -8,6 +8,7 @@ from scripts.extract_text import extract_text_from_html
 from scripts.predict_language import predict
 from scripts.mask_pii import mask_email, mask_phone, mask_ip
 from scripts.harmful_content_detector import classify_nsfw, classify_hate
+from scripts.gopher_quality_filters import is_high_quality
 
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
     return extract_text_from_html(html_bytes)
@@ -42,7 +43,7 @@ def run_classify_quality(text: str) -> tuple[Any, float]:
 
 
 def run_gopher_quality_filter(text: str) -> bool:
-    raise NotImplementedError
+    return is_high_quality(text)
 
 
 def run_exact_line_deduplication(

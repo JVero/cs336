@@ -131,7 +131,8 @@ All 20 cases were correctly identified as non-Toxic. There were no examples that
 ## gopher_quality_filters
 
 Gopher quality filters (3 points)
-
+a. the tests pass, and the code is implemented in scripts/gopher_quality_filters.py
+b. My own judgement says there are some websites in the sample, like a birthday website which got rejected in part because many of the "words" are numbers (years and dates), which fail because the thresholds may too strict. I also haven't seen a representative sample of the internet, so that might still be a sensible threshold. The verdicts on the remaining collection of samples is sensible, but I'm wondering if there's a way to salvage more of the content slop, since I bet a lot of the internet is has menus like that, but many of them probably have usable content once you get past the menu slop.
 
 ## quality_classifier
 
