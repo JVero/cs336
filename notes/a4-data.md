@@ -137,7 +137,8 @@ b. My own judgement says there are some websites in the sample, like a birthday 
 ## quality_classifier
 
 Quality classifier (15 points)
-
+a. Done, in scripts/quality_classifier.py, when you call predict_quality(txt, score=True). score ranges from 0 to 1
+b. Done, predict_quality(txt, score=False), passes the tests
 
 ## minhash_deduplication
 

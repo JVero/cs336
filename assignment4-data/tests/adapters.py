@@ -9,6 +9,7 @@ from scripts.predict_language import predict
 from scripts.mask_pii import mask_email, mask_phone, mask_ip
 from scripts.harmful_content_detector import classify_nsfw, classify_hate
 from scripts.gopher_quality_filters import is_high_quality
+from scripts.quality_classifier import predict_quality
 
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
     return extract_text_from_html(html_bytes)
@@ -39,8 +40,7 @@ def run_classify_toxic_speech(text: str) -> tuple[Any, float]:
 
 
 def run_classify_quality(text: str) -> tuple[Any, float]:
-    raise NotImplementedError
-
+    return predict_quality(text)
 
 def run_gopher_quality_filter(text: str) -> bool:
     return is_high_quality(text)
