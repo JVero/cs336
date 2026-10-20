@@ -120,8 +120,14 @@ It catches a correct email, but it doesn't filter the phone number because this 
 ## harmful_content
 
 Harmful content (6 points)
+a/b. Implemented in scripts/harmful_content_detector.py and the tests pass.
+c.  The filters are really really really flimsy. "fùck" was rated as sfw and non-toxic, "cÖck" is rated ('non-nsfw', 1.0), ('non-toxic', 1.0), vs "cock" ('nsfw', 1.0), ('toxic', 1.0). There's also the negative case of wanting a language model to generate the word "cock" in some contexts (What are the steps to firing a gun? What is the name of a male chicken?). I'd mitigate that with contextually appropriate filters on the input, rather than just what might be a big regex or another linear method. I would mitigate this simple approach's downsides by creating whitelisted versions word usage. Also, this probably creates fragile models, because if they *do* get exposed to the data we naively filtered out of it, it'll produce out of distribution behavior. We'd prefer it be prepared with a "mature" knowledge of how to handle this content, but we'd suppress any instinct of it generating that kind of content itself.
+d. 
+NSFW Classifier test
+All 20 cases were correctly identified as non-NSFW, but in the HATE classifier, which used a separate sample below there were NSFW things classified there. Manually running those through the NSFW classifier correctly output as NSFW. All the correct predictions had a high confidence, so as a first pass I'd set the confidence threshold to 0.99, and if we need more tokens later, I can always turn the threshold knob down. 0/20 were labelled nsfw
 
-
+HATE Classifier test:
+All 20 cases were correctly identified as non-Toxic. There were no examples that were actually toxic, but there were examples of divisive content. For example, Israel / Palestine conflict and other politically charged rhetoric. The examples were not hateful or toxic, just partisan, which may not be appropriate for a language model. Regarding a confdience threshold, the smallest confidence observed in the sample is 0.96 and the rest were 0.98+, so I'd stay on the safe side and set the threshold to 0.98, with the same rule as earlier, where I could always lower the threshold later, if necessary. 0/20 were labelled toxic
 ## gopher_quality_filters
 
 Gopher quality filters (3 points)

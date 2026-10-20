@@ -7,6 +7,7 @@ from typing import Any
 from scripts.extract_text import extract_text_from_html
 from scripts.predict_language import predict
 from scripts.mask_pii import mask_email, mask_phone, mask_ip
+from scripts.harmful_content_detector import classify_nsfw, classify_hate
 
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
     return extract_text_from_html(html_bytes)
@@ -29,11 +30,11 @@ def run_mask_ips(text: str) -> tuple[str, int]:
 
 
 def run_classify_nsfw(text: str) -> tuple[Any, float]:
-    raise NotImplementedError
+    return classify_nsfw(text)
 
 
 def run_classify_toxic_speech(text: str) -> tuple[Any, float]:
-    raise NotImplementedError
+    return classify_hate(text)
 
 
 def run_classify_quality(text: str) -> tuple[Any, float]:
