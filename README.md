@@ -125,6 +125,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 - [x] `harmful_content` Harmful content (6 pts)
 - [x] `gopher_quality_filters` Gopher quality filters (3 pts)
 - [x] `quality_classifier` Quality classifier (15 pts)
+- [x] `exact_deduplication` Exact line deduplication (3 pts)
 - [ ] `minhash_deduplication` MinHash + LSH document deduplication (8 pts)
 - [ ] `filter_data` Filter data for language modeling (6 pts)
 - [ ] `inspect_filtered_data` Inspect filtered data (4 pts)

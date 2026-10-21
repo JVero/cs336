@@ -140,6 +140,9 @@ Quality classifier (15 points)
 a. Done, in scripts/quality_classifier.py, when you call predict_quality(txt, score=True). score ranges from 0 to 1
 b. Done, predict_quality(txt, score=False), passes the tests
 
+## exact_deduplication
+Test passes, implementation is in scripts/exact_deduplication.py
+
 ## minhash_deduplication
 
 MinHash + LSH document deduplication (8 points)

@@ -10,6 +10,7 @@ from scripts.mask_pii import mask_email, mask_phone, mask_ip
 from scripts.harmful_content_detector import classify_nsfw, classify_hate
 from scripts.gopher_quality_filters import is_high_quality
 from scripts.quality_classifier import predict_quality
+from scripts.exact_deduplication import dedup
 
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
     return extract_text_from_html(html_bytes)
@@ -49,7 +50,7 @@ def run_gopher_quality_filter(text: str) -> bool:
 def run_exact_line_deduplication(
     input_files: list[os.PathLike], output_directory: os.PathLike
 ):
-    raise NotImplementedError
+    return dedup(input_files, output_directory)
 
 
 def run_minhash_deduplication(
