@@ -4,14 +4,14 @@ import os
 from typing import Any
 
 
-from scripts.extract_text import extract_text_from_html
-from scripts.predict_language import predict
-from scripts.mask_pii import mask_email, mask_phone, mask_ip
-from scripts.harmful_content_detector import classify_nsfw, classify_hate
-from scripts.gopher_quality_filters import is_high_quality
-from scripts.quality_classifier import predict_quality
-from scripts.exact_deduplication import dedup
-from scripts.minhashing import minhash_dedup
+from scripts.preprocessing.extract_text import extract_text_from_html
+from scripts.preprocessing.predict_language import predict
+from scripts.preprocessing.mask_pii import mask_email, mask_phone, mask_ip
+from scripts.preprocessing.harmful_content_detector import classify_nsfw, classify_hate
+from scripts.preprocessing.gopher_quality_filters import is_high_quality
+from scripts.preprocessing.quality_classifier import predict_quality
+from scripts.preprocessing.exact_deduplication import dedup
+from scripts.preprocessing.minhashing import minhash_dedup
 
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
     return extract_text_from_html(html_bytes)

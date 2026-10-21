@@ -1,12 +1,12 @@
 import fasttext
 from pathlib import Path
 
-from scripts.predict_language import predict as predict_language
-from scripts.harmful_content_detector import classify_nsfw, classify_hate
-from scripts.extract_text import extract_text_from_html
+from scripts.preprocessing.predict_language import predict as predict_language
+from scripts.preprocessing.harmful_content_detector import classify_nsfw, classify_hate
+from scripts.preprocessing.extract_text import extract_text_from_html
 from pathlib import Path
 from fastwarc.warc import ArchiveIterator, WarcRecordType
-from scripts.gopher_quality_filters import is_high_quality
+from scripts.preprocessing.gopher_quality_filters import is_high_quality
 
 from pathlib import Path
 import numpy as np

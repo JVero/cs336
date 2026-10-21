@@ -1,5 +1,5 @@
-from scripts.predict_language import predict
-from scripts.extract_text import extract_text_from_html
+from scripts.preprocessing.predict_language import predict
+from scripts.preprocessing.extract_text import extract_text_from_html
 from pathlib import Path
 from fastwarc.warc import ArchiveIterator, WarcRecordType
 
