@@ -11,6 +11,7 @@ from scripts.harmful_content_detector import classify_nsfw, classify_hate
 from scripts.gopher_quality_filters import is_high_quality
 from scripts.quality_classifier import predict_quality
 from scripts.exact_deduplication import dedup
+from scripts.minhashing import minhash_dedup
 
 def run_extract_text_from_html_bytes(html_bytes: bytes) -> str | None:
     return extract_text_from_html(html_bytes)
@@ -61,4 +62,4 @@ def run_minhash_deduplication(
     jaccard_threshold: float,
     output_directory: os.PathLike,
 ):
-    raise NotImplementedError
+    minhash_dedup(input_files, num_hashes, num_bands, ngrams, jaccard_threshold, output_directory)
