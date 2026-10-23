@@ -44,3 +44,6 @@ assignment2-systems/*/*.csv
 
 # Parsed handout text (scripts/parse_handouts.sh)
 handouts/
+
+# A5 eval outputs (scripts/prompting_baselines.py)
+assignment5-alignment/results*.json
