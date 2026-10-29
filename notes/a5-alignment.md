@@ -101,13 +101,35 @@ Compute the variance of the policy gradient estimator (5 points)
 > (a) For the policy gradient estimator (1/n) Σ r(A_i) ∇_θ log π_θ(A_i), given n iid samples A_i ∼ π_θ, what is the variance of this estimator?
 > **Deliverable:** An expression in terms of n and p, accompanied by a derivation.
 >
+E[Z] = 1 * P * \nabla_{\theta} log(P) + 0 * (1-P) *\nabla_{theta} log(1-P) = \sigma(\theta) (1 - \sigma(\theta)) + 0
+Var(Z) = (E[Z^2] - E[Z]^2)/n
+Var(Z) * n = \sigma(\theta) * (1 - \sigma(\theta))^2 - \sigma(\theta)^2 * (1 - \sigma(\theta)) ^ 2
+Var(Z) * n = \sigma(\theta) * (1 - \sigma(\theta)) ^ 3
+Var(Z) = [\sigma(\theta) * (1 - \sigma(\theta)) ^ 3]/n
+
 > (b) For the baseline-adjusted estimator (1/n) Σ (r(A_i) − b) ∇_θ log π_θ(A_i), what is the variance of this estimator?
 > **Deliverable:** An expression in terms of n, b, and p, accompanied by a derivation and some discussion.
 >
+Z(1) = (1-b)(1-s)
+Z(0) = b s 
+E[Z] = s (1-s)
+E[Z^2] = s (1-b)^2 (1-s)^2 + (1-s) b^2 s^2
+E[Z]^2 = s^2(1-s)^2
+E[Z^2] - E[Z]^2 = s (1-s) (1-b-s)^2
+Var(Z) = s (1-s) (1-b-s)^2 / n
+Var(Z) = \frac{\sigma (1-\sigma)(1-b-\sigma)^{2}}{n} <- sigma is equivalent to p here
+This equation is equivalent to if b=0, which is reassurring. However, if b = (1-s), then the variance collapses to zero, which would be ideal, assuming we can actually know (1-s).
+
 > (c) What is the resulting variance if we substitute the "population mean" baseline b = p? Compare this variance to that of the unadjusted policy gradient estimator: is it always lower, always higher, or sometimes higher or lower depending on p?
+If b = p, because p = \sigma, Var(Z) = \frac{\sigma (1-\sigma)(1-\sigma-\sigma)^{2}}{n} 
+Var(Z) = \frac{\sigma (1-\sigma)(1-2\sigma)^{2}}{n} , compared to the unadjusted policy,
 
-
-
+s(1-s)(1-2s)^2 = s(1-s)^3
+(1-2s)^2 = (1-s)^2
+1-4s+4s^2 = 1-2s + s^2
+3s = 2
+difference = s(1-s)(1-2s)^2 - s(1-s)^3
+at s > 2/3 and s < 1, the difference between them is positive, so subtracting by an s in that range increases the variance. Plotting that graph shows the 3 roots of 0, 2/3, and 1, and between (0, 2/3), the difference between them is negative, so subtracting by an s < 2/3 decreases the varaiance.
 ## tokenize_prompt_and_output
 
 Prompt and output tokenization (1 point)
