@@ -136,7 +136,7 @@ Ticked when the tests pass or the written answer is in `notes/`.
 
 - [x] `prompting_baselines` Run OLMo-2-0425-1B on GSM8K (5 pts)
 - [x] `baseline_calcs` Compute the variance of the policy gradient estimator (5 pts)
-- [ ] `tokenize_prompt_and_output` Prompt and output tokenization (1 pt)
+- [x] `tokenize_prompt_and_output` Prompt and output tokenization (1 pt)
 - [ ] `get_response_log_probs` Response log-probs (and entropy) (1 pt)
 - [ ] `compute_rollout_rewards` Computing the rewards of rollouts (1 pt)
 - [ ] `compute_group_normalized_rewards_grpo` Group normalization (1 pt)
